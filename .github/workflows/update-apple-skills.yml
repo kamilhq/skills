@@ -1,0 +1,81 @@
+name: Update Apple skills
+
+on:
+  schedule:
+    # GitHub updates images weekly, without a guaranteed deployment day.
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-apple-skills
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Select newest installed Xcode
+        id: xcode
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const installations = fs.readdirSync('/Applications')
+            .filter(name => /^Xcode.*\.app$/.test(name))
+            .map(name => {
+              const app = `/Applications/${name}`;
+              const version = execFileSync('/usr/libexec/PlistBuddy', [
+                '-c', 'Print :CFBundleShortVersionString', `${app}/Contents/Info.plist`,
+              ], { encoding: 'utf8' }).trim();
+              return { app, version };
+            })
+            .filter(({ version }) => /^\d+(\.\d+)*$/.test(version))
+            .sort((a, b) => b.version.localeCompare(a.version, 'en', { numeric: true }));
+          const newest = installations[0];
+          if (!newest || newest.version.localeCompare('27.2', 'en', { numeric: true }) < 0) {
+            throw new Error('Xcode 27.2 or newer is required to update these skills.');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `path=${newest.app}\nversion=${newest.version}\n`);
+          console.log(`Using Xcode ${newest.version}: ${newest.app}`);
+          JS
+
+      - name: Extract skills and synchronize files
+        env:
+          XCODE_APP: ${{ steps.xcode.outputs.path }}
+        shell: bash
+        run: |
+          extracted="$RUNNER_TEMP/apple-skills"
+          node scripts/xcode-skills.mjs --xcode "$XCODE_APP" --output "$extracted"
+          # Only synchronize after extraction succeeds; capture removed files too.
+          mkdir -p skills/apple
+          rsync -a --delete "$extracted/" skills/apple/
+
+      - name: Open or update pull request
+        uses: peter-evans/create-pull-request@v8.1.3
+        with:
+          branch: codex/update-apple-skills
+          delete-branch: true
+          add-paths: skills/apple/
+          commit-message: 'Update Apple skills from Xcode ${{ steps.xcode.outputs.version }}'
+          title: 'Update Apple skills from Xcode ${{ steps.xcode.outputs.version }}'
+          body: |
+            Refresh Apple's bundled coding and localization skills from Xcode ${{ steps.xcode.outputs.version }}.
+
+            File contents are preserved from the Xcode bundle. Includes added, changed, and removed files.
+            This PR is updated by the weekly workflow; no PR is created when the skills are unchanged.
+
+            Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

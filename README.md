@@ -49,3 +49,16 @@ It preserves file contents and skips framework symlink aliases. Localization is 
 Reruns overwrite matching files; they do not remove other skills or manually added
 files. `--skill` limits what is copied, not what remains in the destination.
 Some skills require Xcode-specific tools, which this script does not install.
+
+## Weekly updates
+
+[Update Apple skills](.github/workflows/update-apple-skills.yml) runs Mondays at
+06:23 UTC and can also be started manually from GitHub Actions. GitHub publishes
+runner updates weekly but does not guarantee a deployment day, so this checks the
+latest available image each week.
+
+The workflow selects the newest installed Xcode on the `xcode-27` runner (at least
+27.2), extracts into a temporary directory, and synchronizes `skills/apple/`,
+including removals. Changed skills open or update one PR on
+`codex/update-apple-skills`; unchanged skills produce no PR. Updates require review
+and are not merged automatically.
