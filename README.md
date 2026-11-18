@@ -1,14 +1,115 @@
 # Skills
 
-- `skills/apple/`: Apple-authored coding and localization skills extracted from Xcode (below).
-- `skills/games/`: skills for games the user owns:
-  - `byte-identical-game-decomp`: from a GOG installer to decoded data, recovered and named code, a byte-identical
-    rebuild of every binary, and matched C++ (MSVC under Wine).
-  - `game-rewrite`: a full source rewrite in C++ or Rust that builds a native Windows exe and is checked frame by
-    frame against the original with a differential test harness (scripted input, per-frame state traces).
+- [`skills/apple/`](#apple-skills): Apple-authored coding and localization skills extracted from Xcode.
+- [`skills/games/`](#game-skills): reverse engineering and rewriting PC games you own.
 
-  Both run their tools with Python's standard library or Node.js built-ins (each Python script has a parity-tested
-  JavaScript port), plus Ghidra and the target toolchains. Nothing derived from a game is in this repository.
+## Install
+
+`install.sh` installs skills for Claude Code, Codex or both, straight from GitHub (no clone needed):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kamilhq/skills/main/install.sh | sh -s -- --agent claude --skill games
+```
+
+Without `--agent` or `--skill` it asks. Options:
+
+| Option | Meaning |
+|---|---|
+| `--agent claude\|codex\|both` | which agent to install for (repeatable, or comma-separated) |
+| `--skill NAME` | a skill name, a group (`games`, `apple`) or `all` (repeatable, or comma-separated) |
+| `--project DIR` | install into one project instead of for your user |
+| `--ref REF` | branch, tag or commit to install from (default `main`) |
+| `--list` | list the skills and exit |
+| `--dry-run` | show what would be installed, change nothing |
+| `--force` | replace skill folders that this script did not install |
+| `--local` | install from the checkout the script is in (`sh install.sh --local ...`) |
+
+Where the skills go:
+
+| Agent | For your user | With `--project DIR` |
+|---|---|---|
+| Claude Code | `~/.claude/skills/<skill>` | `DIR/.claude/skills/<skill>` |
+| Codex | `~/.agents/skills/<skill>` | `DIR/.agents/skills/<skill>` |
+
+Running it again updates the skills it installed (it marks each folder with a `.skills-install` file).
+Folders it did not install are left alone unless you pass `--force`, and nothing else in those
+directories is touched. A skill that needs another one brings it along (`game-rewrite` installs
+`byte-identical-game-decomp` too). Start a new Claude Code session to load new skills; Codex picks them
+up by itself (restart it if they do not appear). The script needs `sh`, `tar`, and `curl` or `wget`;
+on Windows, run it from Git Bash or WSL.
+
+# Game skills
+
+Two skills that work together, for 32-bit Windows games built with Microsoft Visual C++ that you own
+(for example from a GOG installer):
+
+| Skill | What it does |
+|---|---|
+| [`byte-identical-game-decomp`](skills/games/byte-identical-game-decomp/SKILL.md) | From the installer to decoded data files, complete recovered and named code, a byte-identical rebuild of every binary, and C++ matched function by function with the original compiler. |
+| [`game-rewrite`](skills/games/game-rewrite/SKILL.md) | A full source rewrite in C++ or Rust that builds a native Windows exe, uses the game's own data, and is checked frame by frame against the original with a differential test harness. Starts from the decomp skill's results. |
+
+Every phase ends at a gate a script checks: SHA-256 identity for data and binaries, zero orphan
+instructions for code recovery, identical per-frame traces and save files for a rewrite.
+
+## Use
+
+Install both with `--skill games` ([Install](#install)), then ask the agent in your game project, for
+example "decompile this game, the installer is at ..." or "rewrite it in Rust". Each skill's `SKILL.md`
+describes the phases; the `references/` files hold the details the agent reads when it reaches each phase.
+
+## Requirements
+
+- Python 3.9+ (standard library only) or Node.js 20+ (built-ins only), see below.
+- [Ghidra](https://ghidra-sre.org) 12.x and the JDK it needs, for code recovery.
+- For matching and for the C++ rewrite: the game's original compiler, supplied by you. On macOS and Linux,
+  Wine runs it and the game.
+- For the Rust rewrite: Rust with the `i686-pc-windows-gnu` target (no MinGW needed).
+- The upstream source of any library the game uses, fetched with pinned SHA-256 hashes.
+
+Nothing else is installed: no pip or npm packages, no innoextract, ffmpeg or assemblers. The installer
+reader, decompressors, PNG writer, PE reader and writer, and trace tools are part of the skills.
+`sh skills/games/byte-identical-game-decomp/scripts/check_deps.sh` reports what is present.
+
+## Python and JavaScript
+
+Every script exists twice, in Python (`scripts/*.py`) and as a Node.js port (`scripts/js/*.mjs`) with the
+same command line, output and files. Use whichever runtime you have. The Python versions came first; the
+ports were added so the tools also run where only Node is installed, and both are kept until the ports
+have been used on more projects. Parity suites run both versions and compare the results:
+
+```sh
+# synthetic inputs (fake game, fake Wine and compiler); runs anywhere
+node skills/games/game-rewrite/scripts/js/parity/run_all.mjs
+
+# some tests need a decomp project's binaries and outputs; run it from (or point it at) your project
+node skills/games/byte-identical-game-decomp/scripts/js/parity/run_all.mjs --root PROJECT
+```
+
+A change to a script goes into both versions, with its parity test, in the same commit. The Ghidra scripts
+(Java) and shell wrappers exist once.
+
+## Layout
+
+```text
+skills/games/
+  byte-identical-game-decomp/
+    SKILL.md
+    references/        Intake, decoding, code recovery, naming, reassembly, matching, orchestration
+    scripts/           Pipeline and tools (Python), ghidra/ (Java), formats/ (decoder helpers)
+      js/              Node.js ports, lib/ (ported algorithms), parity/ (tests)
+  game-rewrite/
+    SKILL.md
+    references/        Inventory, toolchains, harness, C++, Rust, orchestration
+    scripts/           Library builds, oracle, scenario runner, trace comparison, C++ and Rust tools
+      js/              Node.js ports and parity tests
+      examples/        Made-up example configs
+```
+
+## What is not here
+
+Nothing derived from a game: no game files, decoded data, decompiled code, names, traces or rewritten
+source. The skills keep all of that in your local project, out of git, and keep any repository with game
+content private. You need your own copy of the game, and of its original compiler for matching.
 
 # Apple skills
 
