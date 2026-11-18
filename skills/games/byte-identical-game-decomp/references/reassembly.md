@@ -49,7 +49,7 @@ Decode: DOS header + stub, Rich header (decoded entries + XOR key; it is a check
 regenerate it from entries and verify), PE/optional headers (every field named), data directories, section
 table, each section's raw bytes as a file, overlay. Encode: write headers back, recompute what is derivable
 (SizeOfImage, section alignment padding, optional-header checksum if it was set) and keep the rest.
-Gate: all 7 Praetorians binaries identical. This is quick and isolates header handling from code.
+Gate: every binary of the game identical. This is quick and isolates header handling from code.
 
 ## Level 1 - sections as structured data
 - `.idata`/import directory -> JSON (DLLs, functions, hint/name, ordinals, IAT/ILT RVAs); regenerate the bytes.

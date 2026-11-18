@@ -54,17 +54,18 @@ its files. Re-run every module after any shared helper changes.
   other fields, a checksum). Recompute CRCs, sizes, offsets, counts; do not store them.
 - Uninitialised memory is common in 2000s-era exporters: fixed-size name slots filled with the previous
   string, stack garbage, `0xCD`/`0xCC` debug fill. Predict it (previous buffer of the same kind, constant
-  fill) and store only the prediction misses. Praetorians' .pba models: 42 KB of misses out of 77 MB.
+  fill) and store only the prediction misses. Done well, a 77 MB model set can need as little as 42 KB of
+  misses.
 - **Known codecs kept verbatim** (DXT1/3/5 blocks, Vorbis/Bink/Smacker packets, IMA-ADPCM when the original
   encoder's choices cannot be reproduced) are not opaque - they are standard, documented encodings - but list
   them in notes and the doc. A kept stream that is already a standard file (`.ogg`, `.mp3`, `.wav`, `.png`)
   needs no preview. For one nobody can open as is, write a stdlib preview decoder in a separate preview
   script whose outputs are never read by encoders: DXT -> PNG, IMA-ADPCM -> WAV, Bink/Smacker audio -> WAV
-  (Praetorians did Bink audio by hand). No external converters (no ffmpeg).
+  (Bink audio can be decoded by hand). No external converters (no ffmpeg).
 - Previews must be made from the REBUILT file (encode, check SHA-256, then convert) so they provably derive
   from the decoded data.
-- A hand-written preview decoder must get levels/scales right (Praetorians' Bink audio decoder was off by
-  exactly 2x: DCT-III scale 1/N vs 2/N). Check numerically: peak/RMS in range, no clipping, sane duration
+- A hand-written preview decoder must get levels/scales right (a Bink audio decoder that was off by
+  exactly 2x: DCT-III scale 1/N vs 2/N, is a real example). Check numerically: peak/RMS in range, no clipping, sane duration
   from the container's sample count.
 
 ## 5. Recipes by format family
@@ -95,8 +96,8 @@ byte-identically requires the same compressed streams. Order of attempts:
 1. Python zlib at levels 1-9 / memLevel / strategy - often reproduces only a subset.
 2. Identify the original packer from `version made by`, extra fields, block structure (non-final deflate
    blocks ending at 32,767 symbols or multiples of 4,096 = Info-ZIP `ct_tally` heuristics), and port its
-   deflate bit-exactly (Praetorians: Info-ZIP 2.3 and a "2.0/MS-DOS" packer, three parameter profiles, a
-   cross-member 64 KB window and an undocumented lazy-match "far rule"; all 3,425 streams regenerated).
+   deflate bit-exactly (one real case: Info-ZIP 2.3 and a "2.0/MS-DOS" packer, three parameter profiles, a
+   cross-member 64 KB window and an undocumented lazy-match "far rule"; every stream regenerated).
 3. Only as a last resort keep a member's raw compressed stream, counted and listed.
 Whole-file obfuscation (e.g. XOR 0xAB) is part of the archive layer: decode, record the key, re-apply.
 

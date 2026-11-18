@@ -2,8 +2,8 @@
 
 ## Prepare
 ```bash
-python3 -I scripts/build_features.py decompiled_full Praetorians.exe analysis/      # features, vtables, chunks
-python3 -I scripts/peek.py Praetorians.exe 0x727420 ...                             # full strings at addresses
+python3 -I scripts/build_features.py decompiled_full Game.exe analysis/      # features, vtables, chunks
+python3 -I scripts/peek.py Game.exe 0x727420 ...                             # full strings at addresses
 ```
 Gather landmarks before spawning namers (each is a free, high-confidence anchor):
 - CRT entry (PE entry point) and what it calls with hInstance/cmdline = `WinMain`; `sprintf`/`malloc` etc.

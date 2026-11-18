@@ -74,8 +74,8 @@ installer-only folders, unsupported RAR-based `.bin` parts) are in `references/i
 ## Phase 2 - inventory
 
 `python3 -I scripts/inventory.py <game_dir>` lists every extension with sizes and detected format, flags
-files that are a known format under a whole-file single-byte XOR (it found Praetorians' `.pak` = ZIP ^ 0xAB
-this way), and counts members inside ZIP-based archives. Then:
+files that are a known format under a whole-file single-byte XOR (for example a `.pak` that is a ZIP XORed
+with one constant byte), and counts members inside ZIP-based archives. Then:
 - extract all archives into `extracted/` (verify each member's CRC/hash; refuse path traversal),
 - build the full format list (archive members + loose files), grouped by extension and magic,
 - list every PE binary (exe, dll, also `.asi`/`.flt`/`.drv` plugins) for phase 4,
@@ -98,7 +98,7 @@ the project). The contract, why it is shaped this way, and the hard-won lessons 
   ADPCM) are listed separately; where the kept stream is not a standard file anyone can open, a stdlib
   preview decoder makes one (DXT -> PNG, ADPCM -> WAV).
 - **Archives last-but-not-least**: rebuilding the archive files themselves usually means reproducing the
-  original compressor bit-exactly (Praetorians needed a Python port of 2003 Info-ZIP deflate).
+  original compressor bit-exactly (this can mean porting a 20-year-old deflate implementation).
 - Use the game's own loader code (phase 4 decompile, `scripts/ghidra/inspect.sh` on demand) to name fields; cite
   function addresses in each module's spec `docs/formats/<module>.md`.
 
@@ -110,7 +110,7 @@ decoded images. Finish with a completeness critic that proves every file in the 
 ## Phase 4 - complete code recovery
 
 Ghidra's default analysis leaves out functions that are reached only through vtables, callback tables or
-computed jumps - in Praetorians.exe that was ~1,950 of 13,124 functions (15%), and 274 of 838 in one DLL.
+computed jumps - about 15% of all functions in a typical 2000s game exe, and up to a third of a DLL's.
 `scripts/ghidra/run_recovery.sh <binary> <out_dir>` runs the full pipeline for one exe/dll:
 aggressive instruction finder, unreferenced relocation-free regions marked as data, pointer-table targets,
 orphan code, never-disassembled code gaps (in rounds, leaving alignment filler and switch index tables alone,
@@ -196,7 +196,6 @@ than shown, say so. When a step is not done, say so.
 | `references/matching-decomp.md` | phase 6; compiler, flags, objcmp.py |
 | `references/orchestration.md` | spawning workflows/subagents for any phase |
 | `references/legal-and-repo.md` | repo setup, what may be committed, privacy |
-| `references/case-study-praetorians.md` | a worked example with real numbers and quirks |
 
 ## Scripts
 

@@ -3,7 +3,7 @@
 #
 # Usage: apply_names.sh <binary> <project_dir> <names.json> <out_dir>
 #   <binary>       the binary run_recovery.sh imported (only its file name is used: it is the program
-#                  name inside the project, e.g. Praetorians.exe)
+#                  name inside the project, e.g. Game.exe)
 #   <project_dir>  the project_dir run_recovery.sh printed (default there: <out_dir>/../ghidra_<stem>)
 #   <names.json>   UTF-8 JSON, either a flat map or a list:
 #                    {"0x401000": "WinMain", "0x401230": "CUnit::Update", "0x401300": "CUnit::~CUnit"}

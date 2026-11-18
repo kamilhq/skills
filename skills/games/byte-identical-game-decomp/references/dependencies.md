@@ -14,7 +14,7 @@ user) and, on macOS/Linux, Wine to run it.
 | Wine | 11.0 | `brew install --cask wine-stable`; distro `wine` | phase 6 only, macOS/Linux only: runs the user's `cl.exe`/`link.exe` |
 | Era SDK headers/libs (DirectX, Platform SDK) | as the game used | user-supplied | phase 6 only, when matched code includes them |
 
-Disk: plan ~10x the install size (Praetorians: 0.5 GB install -> ~2 GB extracted+decoded, plus ~200 MB of
+Disk: plan ~10x the install size (e.g. a 0.5 GB install -> ~2 GB extracted+decoded, plus ~200 MB of
 decompiles and Ghidra projects).
 
 ## What replaced the external tools earlier versions used

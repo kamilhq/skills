@@ -9,8 +9,8 @@ compiler (+ Wine on macOS/Linux), Python stdlib, Ghidra - nothing else.
 ## 1. Identify the toolchain exactly
 - **Rich header** (between the DOS stub and `PE\0\0`, XOR-keyed): list of (product id, build, count). Decode
   it with `python3 -I scripts/rich_header.py <exe> <dlls...>`. Product ids map to tools (C compiler, C++ compiler, MASM, linker, import library, resource
-  converter); builds identify versions. Praetorians.exe: linker 6.00 build 8447; compiler objects at build
-  8047 (172 objects) and MASM 6.13 build 7299. Map builds to service packs with public Rich ID tables, and
+  converter); builds identify versions (e.g. linker 6.00 build 8447; compiler objects at build
+  8047 (172 objects) and MASM 6.13 build 7299). Map builds to service packs with public Rich ID tables, and
   label that mapping as inferred until the user's `cl.exe` banner (`cl` with no args prints
   `Version 12.00.<build>`) confirms the same build.
 - Static libraries carry their own Rich entries (LIBCMT objects compiled by Microsoft); a build seen only
@@ -107,14 +107,14 @@ Record the flag set per object if it varies (DLLs may differ from the exe).
 - Source files with reccmp-style annotations, one per original translation unit where address ranges show
   unit boundaries:
   ```cpp
-  // FUNCTION: PRAETORIANS 0x409180
+  // FUNCTION: GAME 0x409180
   int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR cmd, int show) { ... }
-  // FUNCTION: PRAETORIANS 0x40a2c0 ?Update@CUnit@@QAEXXZ      <- explicit decorated name when needed
+  // FUNCTION: GAME 0x40a2c0 ?Update@CUnit@@QAEXXZ      <- explicit decorated name when needed
   void CUnit::Update() { ... }
-  // STUB: PRAETORIANS 0x40a400                                  <- placeholder, never fails the report
-  // VTABLE: PRAETORIANS 0x715b24
+  // STUB: GAME 0x40a400                                  <- placeholder, never fails the report
+  // VTABLE: GAME 0x715b24
   class CVideoListener { ... };
-  // GLOBAL: PRAETORIANS 0x747164
+  // GLOBAL: GAME 0x747164
   HMODULE g_hZipDll;
   ```
   Also `TEMPLATE`, `SYNTHETIC`, `LIBRARY`, `STRING`; the module name is optional (`--module` filters).

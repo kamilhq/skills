@@ -8,12 +8,12 @@ built with MSVC 6 a large share of code is reached only indirectly:
   `push offset` / stored with `mov [x], offset` (Ghidra disassembles them as "found code from operand
   reference" but makes no function);
 - **code behind computed jumps** - CRT x87 exception dispatch, static-initialiser thunks.
-Praetorians.exe: Ghidra's default analysis gave 11,174 functions; the recovery below gave 13,124 (+1,950,
-of which 1,418 were vtable targets and 497 orphan code). DLLs: DLLDShow 564 -> 838, binkw32 415 -> 635.
+Typical result on a 2000s game exe: the recovery below adds about 15-20% to the functions Ghidra's default
+analysis finds (most of them vtable targets, the rest orphan code); DLLs can gain 30-50%.
 
 ## The pipeline (`scripts/ghidra/run_recovery.sh <binary> <out_dir> [project_dir]`)
 1. Import + full auto-analysis with **Aggressive Instruction Finder** enabled (`EnableAggressiveFinder.java`
-   pre-script). On its own it found nothing extra in Praetorians, but it is cheap and helps other binaries.
+   pre-script). On its own it often finds nothing extra, but it is cheap and helps some binaries.
 2. `UnreferencedRegions.java` - only in a PE with relocations: an interval of `.text` between two anchors
    (relocation site, relocation target, export/entry) holding >= 32768 bytes that are not `00/CC/90` is not
    compiled code (code reaches a global, import, string, float constant or switch table every few hundred
