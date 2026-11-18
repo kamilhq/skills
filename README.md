@@ -1,3 +1,15 @@
+# Skills
+
+- `skills/apple/`: Apple-authored coding and localization skills extracted from Xcode (below).
+- `skills/games/`: skills for games the user owns:
+  - `byte-identical-game-decomp`: from a GOG installer to decoded data, recovered and named code, a byte-identical
+    rebuild of every binary, and matched C++ (MSVC under Wine).
+  - `game-rewrite`: a full source rewrite in C++ or Rust that builds a native Windows exe and is checked frame by
+    frame against the original with a differential test harness (scripted input, per-frame state traces).
+
+  Both run their tools with Python's standard library or Node.js built-ins (each Python script has a parity-tested
+  JavaScript port), plus Ghidra and the target toolchains. Nothing derived from a game is in this repository.
+
 # Apple skills
 
 Apple-authored coding and localization skills extracted from Xcode, with their original contents.

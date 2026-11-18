@@ -17,6 +17,7 @@ import path from 'node:path'
 import * as L from '../lib/rwlib.mjs'
 import { makeFixtures, w } from './fakes.mjs'
 import { CPP_CONFIG, cppProject, writePEs } from './cpp_fixtures.mjs'
+import { rustProject, rustBadInputs, replaceProject } from './rust_fixtures.mjs'
 
 const argv = process.argv.slice(2)
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d }
@@ -30,7 +31,8 @@ const PORTS = {
   compare_traces: 'compare_traces', run_scenario: 'run_scenario', record_oracle: 'record_oracle', run_wine: 'run_wine',
   wintools: 'wintools', build_libs: 'build_libs', cpp_build: 'cpp_build', build_oracle: 'build_oracle',
   'rust_gnu/gen_defs': 'rust_gnu/gen_defs', 'rust_gnu/dlltool': 'rust_gnu/dlltool',
-  'cpp/cppsplit': 'cpp/cppsplit', 'cpp/account': 'cpp/account', 'cpp/emit': 'cpp/emit', 'cpp/gen_data': 'cpp/gen_data'
+  'cpp/cppsplit': 'cpp/cppsplit', 'cpp/account': 'cpp/account', 'cpp/emit': 'cpp/emit', 'cpp/gen_data': 'cpp/gen_data',
+  'rust/gen_skeleton': 'rust/gen_skeleton', 'rust/replace_fn': 'rust/replace_fn'
 }
 
 if (argv.includes('--sync-docs')) {
@@ -74,6 +76,13 @@ function gameProject (rwOver = {}) {
   w(path.join(W, 'harness', 'scenarios', '01_walk.txt'), '# walk right then left\n#! exit_frame=20\nTEST-REPLAY 1\n0 -\n3 right  # go\n9 right+z\n12 left\n15 -\n')
   w(path.join(W, 'harness', 'scenarios', '02_idle.txt'), '#! exit_frame=6\nTEST-REPLAY 1\n0 -\n')
   w(path.join(W, 'harness', 'scenarios', 'no_exit.txt'), 'TEST-REPLAY 1\n0 -\n')
+}
+function seededProject () {
+  gameProject()
+  w(path.join(W, 'harness', 'levels', 'test_a.lvl'), 'level a\n')
+  w(path.join(W, 'harness', 'seed_unlock.sav'), 'unlocked=1\n')
+  w(path.join(W, 'harness', 'scenarios', '03_seeded.txt'), '#! exit_frame=4\n#! seed=levels/test_a.lvl:../levels/test_a.lvl\n#! seed=saves/unlock.sav:../seed_unlock.sav\n#! arg=-playing\n#! arg=test_a\nTEST-REPLAY 1\n0 right\n')
+  w(path.join(W, 'harness', 'scenarios', '04_bad_seed.txt'), '#! exit_frame=4\n#! seed=levels/x.lvl:../levels/missing.lvl\nTEST-REPLAY 1\n0 -\n')
 }
 const LIBS = {
   defaults: { dll_syslibs: ['kernel32.lib'] },
@@ -168,6 +177,8 @@ const rs = ['--exe', 'bin/game.exe', '--scenario', 'harness/scenarios/01_walk.tx
 add('run_scenario', 'walk + saves', [...rs, '--saves-out', 'out/saves', '--game', 'gamedir'], { setup: () => gameProject() })
 add('run_scenario', 'flaky start retried', [...rs, '--saves-out', 'out/saves'], { setup: () => gameProject(), env: { FAKE_MODE: 'flaky' } })
 add('run_scenario', 'no fb, args, env', [...rs, '--no-fb', '--exit-frame', '5', '--arg', '-extra', '--env', 'FAKE_EXTRA=yes'], { setup: () => gameProject() })
+add('run_scenario', 'seeded files and scenario args', ['--exe', 'bin/game.exe', '--scenario', 'harness/scenarios/03_seeded.txt', '--out', 'out/seeded.trace', '--saves-out', 'out/saves', '--arg', '-extra'], { setup: () => seededProject() })
+add('run_scenario', 'missing seed file', ['--exe', 'bin/game.exe', '--scenario', 'harness/scenarios/04_bad_seed.txt', '--out', 'out/x.trace'], { setup: () => seededProject() })
 add('run_scenario', 'never writes a trace', [...rs, '--tries', '2', '--stall', '1'], { setup: () => gameProject(), env: { FAKE_MODE: 'never' } })
 add('run_scenario', 'no exit frame', ['--exe', 'bin/game.exe', '--scenario', 'harness/scenarios/no_exit.txt', '--out', 'x.trace'], { setup: () => gameProject() })
 add('run_scenario', 'usage: missing --exe', ['--scenario', 'x', '--out', 'y'])
@@ -280,6 +291,44 @@ for (const b of ['bad_addr', 'bad_range', 'bad_type', 'bad_format', 'bad_key', '
   add('cpp/gen_data', b, ['--config', b + '.json'], { setup: () => writePEs(W) })
 }
 add('cpp/gen_data', 'help', ['--help'])
+// rust/gen_skeleton
+const GU = ['index', '--units', 'src_matched/GAME']
+add('rust/gen_skeleton', 'index from units', [...GU, '--cpp-config', 'cpp.json', '--names', 'names.json', '--headers', 'src_matched/GAME/include', '--out', 'out/index.json'], { setup: () => cppProject(W) })
+add('rust/gen_skeleton', 'index: module option, crlf', [...GU, '--module', 'GAME', '--out', 'idx.json'], { setup: () => cppProject(W, { crlf: true }) })
+add('rust/gen_skeleton', 'index: no units folder', ['index', '--units', 'nope', '--out', 'x.json'])
+add('rust/gen_skeleton', 'index: missing --out', GU, { setup: () => cppProject(W) })
+add('rust/gen_skeleton', 'index: bad names', [...GU, '--names', 'bad.json', '--out', 'x.json'], { setup: () => { cppProject(W); rustBadInputs(W) } })
+add('rust/gen_skeleton', 'index: bad cpp config', [...GU, '--cpp-config', 'bad.json', '--out', 'x.json'], { setup: () => { cppProject(W); rustBadInputs(W) } })
+add('rust/gen_skeleton', 'index: no headers folder', [...GU, '--headers', 'nope', '--out', 'x.json'], { setup: () => cppProject(W) })
+const GG = ['generate', '--config', 'rust.json', '--index', 'rindex.json', '--crate', 'crate']
+add('rust/gen_skeleton', 'generate: new crate', GG, { setup: () => rustProject(W) })
+add('rust/gen_skeleton', 'generate: hand edits kept', [...GG, '--names-out', 'out/names.tsv'], { setup: () => rustProject(W, { crate: true, removeOne: true }) })
+add('rust/gen_skeleton', 'generate: dry run', [...GG, '--dry-run'], { setup: () => rustProject(W, { crate: true }) })
+add('rust/gen_skeleton', 'generate: cx all, no statics', GG, { setup: () => rustProject(W, { cfg: { cx: { mode: 'all' }, statics: null } }) })
+add('rust/gen_skeleton', 'generate: cx none', GG, { setup: () => rustProject(W, { cfg: { cx: { mode: 'none' } } }) })
+add('rust/gen_skeleton', 'generate: methods always', GG, { setup: () => rustProject(W, { cfg: { cx: { mode: 'analyse', methods: 'always', state: ['world\\.'] } } }) })
+add('rust/gen_skeleton', 'generate: list index, empty config', ['generate', '--config', 'empty.json', '--index', 'list.json', '--crate', 'c2'], { setup: () => rustBadInputs(W) })
+add('rust/gen_skeleton', 'generate: bad config', ['generate', '--config', 'bad.json', '--index', 'list.json', '--crate', 'c'], { setup: () => rustBadInputs(W) })
+add('rust/gen_skeleton', 'generate: bad regex', ['generate', '--config', 'badrx.json', '--index', 'list.json', '--crate', 'c'], { setup: () => rustBadInputs(W) })
+add('rust/gen_skeleton', 'generate: bad cx regex', GG, { setup: () => rustProject(W, { cfg: { cx: { mode: 'analyse', state: ['(open'] } } }) })
+add('rust/gen_skeleton', 'generate: bad skip_globals regex', GG, { setup: () => rustProject(W, { cfg: { skip_globals: { names: ['[x'] } } }) })
+add('rust/gen_skeleton', 'generate: index entry without address', ['generate', '--config', 'empty.json', '--index', 'badidx.json', '--crate', 'c'], { setup: () => rustBadInputs(W) })
+add('rust/gen_skeleton', 'generate: bad globals', ['generate', '--config', 'empty.json', '--index', 'badglob.json', '--crate', 'c'], { setup: () => rustBadInputs(W) })
+add('rust/gen_skeleton', 'generate: bad manifest', ['generate', '--config', 'empty.json', '--index', 'list.json', '--crate', 'badman'], { setup: () => rustBadInputs(W) })
+add('rust/gen_skeleton', 'generate: missing index', ['generate', '--config', 'empty.json', '--index', 'nope.json', '--crate', 'c'], { setup: () => rustBadInputs(W) })
+add('rust/gen_skeleton', 'generate: missing options', ['generate', '--config', 'empty.json'])
+add('rust/gen_skeleton', 'unknown command', ['build'])
+add('rust/gen_skeleton', 'usage: no command', [])
+add('rust/gen_skeleton', 'help', ['--help'])
+// rust/replace_fn
+add('rust/replace_fn', 'replace (impl, re-indent, duplicates, missing)', ['src/m.rs', 'new.rs'], { setup: () => replaceProject(W) })
+add('rust/replace_fn', 'crlf target', ['src/m.rs', 'new.rs'], { setup: () => replaceProject(W, { crlf: true }) })
+add('rust/replace_fn', 'dry run', ['src/m.rs', 'new.rs', '--dry-run'], { setup: () => replaceProject(W) })
+add('rust/replace_fn', 'one block', ['src/m.rs', 'one.rs'], { setup: () => replaceProject(W) })
+add('rust/replace_fn', 'no address lines', ['src/m.rs', 'none.rs'], { setup: () => replaceProject(W) })
+add('rust/replace_fn', 'missing target', ['nope.rs', 'new.rs'], { setup: () => replaceProject(W) })
+add('rust/replace_fn', 'usage', ['src/m.rs'])
+add('rust/replace_fn', 'help', ['-h'])
 
 // ------------------------------------------------------------------------------------------ running
 const MASKS = [
@@ -296,7 +345,7 @@ function snapshot (dir) {
       const st = fs.lstatSync(path.join(dir, r))
       if (st.isDirectory()) { files.set(r + '/', 'dir'); walk(r) } else {
         const b = fs.readFileSync(path.join(dir, r))
-        files.set(r, /\.(json|log|txt|trace|def|h|cpp|inc|md)$/.test(n) ? mask(b.toString('utf8')) : b.toString('base64'))
+        files.set(r, /\.(json|log|txt|trace|def|h|cpp|inc|md|rs|tsv)$/.test(n) ? mask(b.toString('utf8')) : b.toString('base64'))
       }
     }
   }
@@ -316,7 +365,7 @@ function runSide (c, side) {
 }
 const results = []; let pyMs = 0; let jsMs = 0
 for (const c of cases) {
-  if (ONLY && !ONLY.split(',').includes(c.script.replace(/^(rust_gnu|cpp)\//, ''))) continue
+  if (ONLY && !ONLY.split(',').includes(c.script.replace(/^(rust_gnu|cpp|rust)\//, ''))) continue
   const p = runSide(c, 'py'); const j = runSide(c, 'js')
   pyMs += p.ms; jsMs += j.ms
   const diffs = []

@@ -2,17 +2,42 @@
 // Port of ../run_scenario.py (same command line, output and exit codes). Node built-ins only.
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import path from 'node:path'
 import * as L from './lib/rwlib.mjs'
 
 const PROG = 'run_scenario'
-const DOC = "Run one scenario (a replay file) with a game exe and collect its per-frame trace and save files.\n\n  python3 -I run_scenario.py --exe EXE --scenario FILE --out TRACE [--game DIR] [--exit-frame N]\n         [--timeout S] [--stall S] [--tries N] [--settle S] [--saves-out DIR] [--no-fb] [--keep]\n         [--arg A]... [--env K=V]... [--runner wine|native] [--project DIR]\n\nThe exe is the oracle or a rewrite; both implement the same hooks (references/harness.md). The game folder\n(--game, else decomp.json rewrite.game, else the exe's folder) is copied to a scratch folder and the exe is\nput into the copy under the name rewrite.exe_name (default: the exe's own name), so the original folder is\nnever written to. The program runs with:\n  env  rewrite.env.replay = the replay file, rewrite.env.trace = the trace file to write,\n       rewrite.env.exit_frame = N (quit after the line of frame N), rewrite.env.fb = \"0\" with --no-fb,\n       rewrite.extra_env, --env K=V\n  args rewrite.args then --arg values; \"{basedir}\" in them becomes an empty scratch folder (settings and\n       saves start from defaults and never touch the user's), \"{game}\" the scratch game folder.\nPaths given to the program are Wine paths (Z:\\...) under --runner wine (default on macOS/Linux), host\npaths under native (default on Windows). The exit frame comes from --exit-frame or a \"#! exit_frame=N\" line\nof the scenario. A try counts when the trace has the header (rewrite.trace.header, if set) and a line for\nevery frame 0..N. Otherwise it is tried again (Wine sometimes ends or hangs a starting process): a try is\nabandoned after --timeout seconds (default 60 + 4x the scenario's real-time length at rewrite.fps, default\n30) or when the trace has not grown for --stall seconds (default 30). --saves-out copies the save folder\n(basedir/<rewrite.saves>, default the whole basedir) after a good run.\nPrints a JSON summary; exit 0 on success. Env: WINE, WINESERVER, WINEPREFIX. Python standard library only."
+const DOC = "Run one scenario (a replay file) with a game exe and collect its per-frame trace and save files.\n\n  python3 -I run_scenario.py --exe EXE --scenario FILE --out TRACE [--game DIR] [--exit-frame N]\n         [--timeout S] [--stall S] [--tries N] [--settle S] [--saves-out DIR] [--no-fb] [--keep]\n         [--arg A]... [--env K=V]... [--runner wine|native] [--project DIR]\n\nThe exe is the oracle or a rewrite; both implement the same hooks (references/harness.md). The game folder\n(--game, else decomp.json rewrite.game, else the exe's folder) is copied to a scratch folder and the exe is\nput into the copy under the name rewrite.exe_name (default: the exe's own name), so the original folder is\nnever written to. The program runs with:\n  env  rewrite.env.replay = the replay file, rewrite.env.trace = the trace file to write,\n       rewrite.env.exit_frame = N (quit after the line of frame N), rewrite.env.fb = \"0\" with --no-fb,\n       rewrite.extra_env, --env K=V\n  args rewrite.args then --arg values; \"{basedir}\" in them becomes an empty scratch folder (settings and\n       saves start from defaults and never touch the user's), \"{game}\" the scratch game folder.\nPaths given to the program are Wine paths (Z:\\...) under --runner wine (default on macOS/Linux), host\npaths under native (default on Windows). The exit frame comes from --exit-frame or a \"#! exit_frame=N\" line\nof the scenario. A scenario can also carry\n  \"#! seed=<path in the basedir>:<file, relative to the scenario's folder>\"  copied into the fresh basedir\n                                       before every try (test levels, a settings or unlock file)\n  \"#! arg=<argument>\"                  one program argument per line, after rewrite.args and before --arg\nA try counts when the trace has the header (rewrite.trace.header, if set) and a line for\nevery frame 0..N. Otherwise it is tried again (Wine sometimes ends or hangs a starting process): a try is\nabandoned after --timeout seconds (default 60 + 4x the scenario's real-time length at rewrite.fps, default\n30) or when the trace has not grown for --stall seconds (default 30). --saves-out copies the save folder\n(basedir/<rewrite.saves>, default the whole basedir) after a good run.\nPrints a JSON summary; exit 0 on success. Env: WINE, WINESERVER, WINEPREFIX. Python standard library only."
 const DEFAULT_ENV = { replay: 'GAME_REPLAY', trace: 'GAME_TRACE', exit_frame: 'GAME_EXIT_FRAME', fb: 'GAME_TRACE_FB' }
+
+function scenarioExtras (p) {
+  // -> [seeds [[dest in basedir, absolute source]], args [str]] from the "#! seed=" / "#! arg=" lines
+  const base = L.dirname(L.abspath(p))
+  const seeds = []; const args = []
+  for (const line of fs.readFileSync(p, 'utf8').split('\n')) {
+    const s = line.trim()
+    if (s.startsWith('#! seed=')) {
+      const rest = s.slice('#! seed='.length)
+      const i = rest.indexOf(':')
+      const dest = i < 0 ? rest : rest.slice(0, i)
+      const src = i < 0 ? '' : rest.slice(i + 1)
+      seeds.push([dest.trim(), path.resolve(base, src.trim())])
+    } else if (s.startsWith('#! arg=')) {
+      args.push(s.slice('#! arg='.length))
+    }
+  }
+  return [seeds, args]
+}
 
 async function runOnce (ctx, exitFrame) {
   const { trace, basedir } = ctx
   if (fs.existsSync(trace)) fs.rmSync(trace)
   if (fs.existsSync(basedir)) L.rmtree(basedir)
   L.makedirs(basedir)
+  for (const [dest, src] of ctx.seeds) {
+    const d = path.join(basedir, ...dest.replaceAll('\\', '/').split('/'))
+    L.makedirs(path.dirname(d))
+    L.copy2(src, d)
+  }
   L.wineserverKill(ctx.mode, ctx.env)
   await L.sleep(ctx.settle * 1000)
   const t0 = Date.now()
@@ -68,6 +93,12 @@ export async function main (argv) {
     process.stdout.write(L.dumps(new Map([['ok', false], ['error', 'no exit frame (--exit-frame or "#! exit_frame=N" in the scenario)']])) + '\n')
     return 2
   }
+  const [seeds, scenArgs] = scenarioExtras(a.scenario)
+  const missing = seeds.filter(([, src]) => !L.isfile(src)).map(([, src]) => src)
+  if (missing.length) {
+    process.stdout.write(L.dumps(new Map([['ok', false], ['error', 'seed file not found: ' + path.basename(missing[0])]])) + '\n')
+    return 2
+  }
   const fps = L.num(rw.fps !== undefined ? rw.fps : 30)
   const timeout = (a.timeout !== null && L.num(a.timeout)) || (60 + exitFrame / fps * 4)
   const names = Object.assign({}, DEFAULT_ENV, rw.env || {})
@@ -94,9 +125,9 @@ export async function main (argv) {
     else env[kv.slice(0, i)] = kv.slice(i + 1)
   }
   const subst = [['{basedir}', L.winpath(basedir, native)], ['{game}', L.winpath(exeDir, native)]]
-  const args = [...(rw.args || []), ...a.arg].map(x => { for (const [k, v] of subst) x = x.replaceAll(k, v); return x })
+  const args = [...(rw.args || []), ...scenArgs, ...a.arg].map(x => { for (const [k, v] of subst) x = x.replaceAll(k, v); return x })
   const ctx = {
-    mode, env, exe_dir: exeDir, trace, basedir, cmd: L.exeCommand(mode, exeName, exeDir, args), timeout,
+    mode, env, exe_dir: exeDir, trace, basedir, seeds, cmd: L.exeCommand(mode, exeName, exeDir, args), timeout,
     stall: L.num(a.stall), settle: L.num(a.settle), header: L.get(rw, 'trace.header'), ff: L.get(rw, 'trace.frame_field', 'f')
   }
   const tries = []

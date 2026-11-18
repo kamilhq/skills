@@ -33,8 +33,8 @@ Details are in the references; read the one for each step before starting it.
 | `references/toolchains.md` | step 2: C++ (original MSVC, or current MSVC / clang-cl), Rust (windows targets, raw-dylib, cross build without MinGW), `libraries.json`, the hello gate, Wine vs Windows |
 | `references/harness.md` | steps 3 and 5: the oracle, hook points, determinism, replay and trace formats, scenarios, comparison, the hooks in the rewrite |
 | `references/cpp.md` | step 4 in C++: from matched units (or pseudocode) to a clean tree by subsystem; the one-shot generator; what is scaffolding; extern-only data; link order; entry point; build; accounting; testing with real input |
-| `references/rust.md` | (planned) a Rust rewrite: module layout, FFI to libraries, translating MSVC C++ idioms |
-| `references/orchestration.md` | (planned) splitting the rewrite across agents, review, the comparison loop |
+| `references/rust.md` | step 4 in Rust: crate layout, the `Cx` context struct and the borrow rule, FFI to the library DLLs (C API shims, callbacks on other threads), the numeric fidelity checklist (x87 vs SSE, `ftol`, wrapping, signed `char`, argument order, macros that evaluate twice), strings, containers, UB the original relies on, the skeleton generator, testing |
+| `references/orchestration.md` | before step 2 when agents do the work: which steps are single-agent, the wave pattern (brief, private copies, owned modules, WAVE_NOTES), integration, the comparison loop with the other rewrite as reference, widening scenarios, independent verification, operational lessons |
 
 ## Project config
 Everything game-specific lives in the project, in a `"rewrite"` section of the decomp skill's
@@ -84,11 +84,21 @@ made-up matched units, a tiny PE) and must report every case identical. Change b
 | `cpp/keysend.cpp` | 4, 6 | Win32 tool: post scripted key presses to a window by title (real input) |
 | `examples/libraries_vvvvvv.json` | 1, 2 | the validated case's complete `libraries.json` |
 | `examples/cpp_config_vvvvvv.json` | 4 | the validated case's cpp config (placement, scaffolding patterns, renames, constants, data tables) |
+| `rust/gen_skeleton.py` | 4 | `index`: function index from matched units (address, name, C++ head, unit, class, body; globals; class members); `generate`: one Rust stub per function with its address line, `src/state/statics.rs`, `names.tsv`, never over a hand-edited file |
+| `rust/replace_fn.py` | 4 | replace functions in a `.rs` file by new versions, matched by their `// 0x<address>` line |
+| `rust/template/` | 4 | `stub.rs` (stub macro, log file, panic hook), `cnum.rs` (MSVC `rand`, `ftol`, C numerics), `cbuf.rs` (`CBuf<N>` = `char[N]`): generic, copy into the crate |
+| `examples/rust_config_vvvvvv.json` | 4 | the validated case's gen_skeleton config (modules, class roles, placement rules, cx analysis, type mapping) |
 
 ## Validated on
 VVVVVV 2.4.4 (VS2010 SP1, SDL2, seven static libraries): libraries pinned from the binary, both toolchains'
-hello programs `RESULT: OK` under Wine on macOS, an oracle with 4 edited functions whose 3 scenarios (1,101
-to 1,601 frames) gave byte-identical traces and saves in 3 of 3 runs each. The C++ rewrite: 976 game
-functions brought over from the matched units (all 12 NONMATCHING included) plus a rewritten WinMain, in 60
-`.cpp` and 49 `.h` files; it builds with VS2010 and all 3 scenarios are identical to the oracle, framebuffer
-hash included, with byte-identical saves. The Rust rewrite is in progress.
+hello programs `RESULT: OK` under Wine on macOS, an oracle with 4 edited functions and 19 scenarios (951 to
+5,001 frames: menus, play modes, time trials, the editor, own test levels, languages, fuzz) that gave
+byte-identical traces and saves in every run. Steps 1-5 are done for both languages:
+- **C++ rewrite**: 976 game functions (all 12 NONMATCHING included) plus a rewritten WinMain, 60 `.cpp` and
+  49 `.h` files, built with VS2010;
+- **Rust rewrite**: 936 functions translated from generated stubs plus 15 written by hand, 31 modules,
+  about 78,500 lines, `i686-pc-windows-gnu` with rust-lld and the libraries as DLLs, `unsafe` only in the FFI
+  layer; built by 8 parallel translation waves and one integration (`orchestration.md`);
+- **both are identical to the original in all 19 scenarios**, framebuffer hash and save files included; 39
+  of 40 extra Rust-vs-C++ fuzz replays are identical too (the 40th quits early in both).
+Step 6, the user playing the rewrite on Windows, is pending.

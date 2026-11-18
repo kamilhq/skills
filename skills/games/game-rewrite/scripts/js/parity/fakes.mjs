@@ -58,6 +58,15 @@ trace = host(os.environ['GAME_TRACE'])
 exit_frame = int(os.environ['GAME_EXIT_FRAME'])
 fb = os.environ.get('GAME_TRACE_FB', '1') != '0'
 basedir = host(args[args.index('-basedir') + 1]).rstrip('/') if '-basedir' in args else None
+seen = []
+if basedir and os.path.isdir(basedir):
+    for root, dirs, files in os.walk(basedir):
+        for n in files:
+            fp = os.path.join(root, n)
+            with open(fp) as sf:
+                seen.append(os.path.relpath(fp, basedir).replace(os.sep, '/') + ' ' + sf.read().strip())
+    seen.sort()
+plain_args = [x for i, x in enumerate(args) if not (i > 0 and args[i - 1] == '-basedir')]
 events = []
 header = False
 for line in open(replay):
@@ -93,6 +102,10 @@ if basedir:
         f.write('frames=%d\n' % (exit_frame + 1))
     with open(os.path.join(basedir, 'log.txt'), 'w') as f:
         f.write('basedir file, not a save\n')
+    with open(os.path.join(basedir, 'saves', 'seen.sav'), 'w') as f:
+        f.write('args=%s\n' % ' '.join(plain_args))
+        for line in seen:
+            f.write(line + '\n')
 `
 
 // msvc.sh stand-in: logs each call, writes the objects / libraries / DLLs the real tools would

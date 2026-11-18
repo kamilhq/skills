@@ -16,7 +16,11 @@ never written to. The program runs with:
        saves start from defaults and never touch the user's), "{game}" the scratch game folder.
 Paths given to the program are Wine paths (Z:\\...) under --runner wine (default on macOS/Linux), host
 paths under native (default on Windows). The exit frame comes from --exit-frame or a "#! exit_frame=N" line
-of the scenario. A try counts when the trace has the header (rewrite.trace.header, if set) and a line for
+of the scenario. A scenario can also carry
+  "#! seed=<path in the basedir>:<file, relative to the scenario's folder>"  copied into the fresh basedir
+                                       before every try (test levels, a settings or unlock file)
+  "#! arg=<argument>"                  one program argument per line, after rewrite.args and before --arg
+A try counts when the trace has the header (rewrite.trace.header, if set) and a line for
 every frame 0..N. Otherwise it is tried again (Wine sometimes ends or hangs a starting process): a try is
 abandoned after --timeout seconds (default 60 + 4x the scenario's real-time length at rewrite.fps, default
 30) or when the trace has not grown for --stall seconds (default 30). --saves-out copies the save folder
@@ -37,6 +41,21 @@ PROG = 'run_scenario'
 DEFAULT_ENV = {'replay': 'GAME_REPLAY', 'trace': 'GAME_TRACE', 'exit_frame': 'GAME_EXIT_FRAME', 'fb': 'GAME_TRACE_FB'}
 
 
+def scenario_extras(path):
+    """-> (seeds [(dest in basedir, absolute source)], args [str]) from the "#! seed=" / "#! arg=" lines"""
+    base = os.path.dirname(os.path.abspath(path))
+    seeds, args = [], []
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            s = line.strip()
+            if s.startswith('#! seed='):
+                dest, _, src = s[len('#! seed='):].partition(':')
+                seeds.append((dest.strip(), os.path.normpath(os.path.join(base, src.strip()))))
+            elif s.startswith('#! arg='):
+                args.append(s[len('#! arg='):])
+    return seeds, args
+
+
 def run_once(ctx, exit_frame):
     trace, basedir = ctx['trace'], ctx['basedir']
     if os.path.exists(trace):
@@ -44,6 +63,10 @@ def run_once(ctx, exit_frame):
     if os.path.exists(basedir):
         shutil.rmtree(basedir)
     os.makedirs(basedir)
+    for dest, src in ctx['seeds']:
+        d = os.path.join(basedir, *dest.replace('\\', '/').split('/'))
+        os.makedirs(os.path.dirname(d), exist_ok=True)
+        shutil.copy2(src, d)
     rwlib.wineserver_kill(ctx['mode'], ctx['env'])
     time.sleep(ctx['settle'])
     t0 = time.time()
@@ -102,6 +125,11 @@ def main(argv):
         sys.stdout.write(rwlib.dumps({'ok': False, 'error': 'no exit frame (--exit-frame or "#! exit_frame=N" '
                                                             'in the scenario)'}) + '\n')
         return 2
+    seeds, scen_args = scenario_extras(a['scenario'])
+    missing = [src for _, src in seeds if not os.path.isfile(src)]
+    if missing:
+        sys.stdout.write(rwlib.dumps({'ok': False, 'error': 'seed file not found: ' + os.path.basename(missing[0])}) + '\n')
+        return 2
     fps = rw.get('fps', 30)
     timeout = a['timeout'] or (60 + exit_frame / float(fps) * 4)
     names = dict(DEFAULT_ENV, **(rw.get('env') or {}))
@@ -129,11 +157,11 @@ def main(argv):
         env[k] = v
     subst = {'{basedir}': rwlib.winpath(basedir, native), '{game}': rwlib.winpath(exe_dir, native)}
     args = []
-    for x in list(rw.get('args') or []) + a['arg']:
+    for x in list(rw.get('args') or []) + scen_args + a['arg']:
         for k, v in subst.items():
             x = x.replace(k, v)
         args.append(x)
-    ctx = {'mode': mode, 'env': env, 'exe_dir': exe_dir, 'trace': trace, 'basedir': basedir,
+    ctx = {'mode': mode, 'env': env, 'exe_dir': exe_dir, 'trace': trace, 'basedir': basedir, 'seeds': seeds,
            'cmd': rwlib.exe_command(mode, exe_name, exe_dir, args), 'timeout': timeout, 'stall': a['stall'],
            'settle': a['settle'], 'header': rwlib.get(rw, 'trace.header'),
            'ff': rwlib.get(rw, 'trace.frame_field', 'f')}

@@ -99,6 +99,8 @@ The oracle must give the same trace on every run. Each source of variation needs
 ```
 # comment; blank lines are ignored
 #! exit_frame=1500        <- runner metadata (a comment for the game)
+#! seed=levels/test.lvl:../levels/test.lvl   <- copied into the fresh basedir before every try
+#! arg=-playing           <- one program argument per line (after rewrite.args, before --arg)
 GAME-REPLAY 1             <- first non-comment line: the format and its version
 0 -
 40 z
@@ -227,7 +229,7 @@ The rewrite implements the same contract as a permanent, switched-off-by-default
 - the same frame structure: poll, input hook, logic, snapshot, render, framebuffer hash, write, exit check;
 - under replay, one fixed step per render and no interpolation;
 - the original's random number generators, bit for bit, called in the same order (a Rust rewrite needs its
-  own MSVC `rand()`: per thread, seed 1, the LCG above);
+  own MSVC `rand()`: per thread, seed 1, the LCG above; `scripts/rust/template/cnum.rs` has it);
 - the same field definitions, byte orders and hash inputs.
 For C/C++ rewrites, `scripts/harness/harness_core.h` holds the game-independent half (replay parsing,
 FNV-1a, float bits, framebuffer hash, line building, exit frame). The oracle's hook header and the C++
