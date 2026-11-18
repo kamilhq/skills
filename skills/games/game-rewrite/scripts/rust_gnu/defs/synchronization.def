@@ -1,0 +1,5 @@
+LIBRARY api-ms-win-core-synch-l1-2-0.dll
+EXPORTS
+    _WaitOnAddress@16 == WaitOnAddress
+    _WakeByAddressAll@4 == WakeByAddressAll
+    _WakeByAddressSingle@4 == WakeByAddressSingle

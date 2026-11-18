@@ -1,0 +1,3 @@
+LIBRARY userenv.dll
+EXPORTS
+    _GetUserProfileDirectoryW@12 == GetUserProfileDirectoryW

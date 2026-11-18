@@ -1,0 +1,131 @@
+{
+ "about": "Made-up cpp config (account.py, emit.py, gen_data.py) for a small 2D game whose matched units live in src_matched/GAME: every key once, with invented names, files and addresses. A real project's config has the same shape, only longer. Paths are relative to the project folder; regexes match whole names.",
+ "module": "GAME",
+ "units": "src_matched/GAME",
+ "unit_id": "^([0-9]{3})_",
+ "unit_exts": [".cpp", ".c"],
+ "library_units": ["004", "011", "012"],
+ "unit_dest": {
+  "main/Main.cpp": ["001", "002"],
+  "game/Game.cpp": ["003", "005"],
+  "graphics/Renderer.cpp": ["006", "007"],
+  "entity/Entity.cpp": ["008"],
+  "audio/Audio.cpp": ["009"],
+  "util/Strings.cpp": ["010"]
+ },
+ "class_dest": {
+  "Game": "game/Game.cpp",
+  "Renderer": "graphics/Renderer.cpp",
+  "Player": "entity/Player.cpp",
+  "Enemy": "entity/Enemy.cpp",
+  "World": "world/World.cpp",
+  "AudioMixer": "audio/Audio.cpp",
+  "InputState": "input/Input.cpp"
+ },
+ "name_dest": {
+  "utf8_next": "util/Utf8.cpp",
+  "utf8_len": "util/Utf8.cpp",
+  "save_settings": "game/Settings.cpp"
+ },
+ "addr_dest": {
+  "0x40a3c0": "util/Strings.cpp"
+ },
+ "default_dest": "misc/Misc.cpp",
+ "namespaces": ["text", "save"],
+ "type_aliases": {
+  "Uint8": "unsigned char",
+  "Uint16": "unsigned short",
+  "Uint32": "unsigned int",
+  "Sint32": "int"
+ },
+ "strip_qualifiers": ["std::"],
+ "drop": {
+  "lines": ["^\\s*//\\s*CLFLAGS:"],
+  "functions": ["use_\\w+|instantiate_\\w+|\\w+_caller|\\w*standin\\w*|\\w+_inline"],
+  "keys": ["Renderer::get_rgb(int,int,int)"],
+  "types": ["StrRef", "FlagsArg", "check_\\w+", "SDL_\\w+"],
+  "macros": ["CHECK_SIZE", "LOCAL_\\w+"],
+  "includes": ["stand_in_types\\.h"],
+  "declspecs": ["noinline", "safebuffers", "nothrow"],
+  "keywords": {"__fastcall": "", "__forceinline": "inline"}
+ },
+ "renames": {
+  "members": {
+   "fill_rect_xywh_rgb": "fill_rect",
+   "print_string": "print",
+   "set_color_rgb": "set_color"
+  },
+  "global": {
+   "game_exit_inline": "game_exit"
+  },
+  "units": {
+   "007": {"g_debug_view": "g_show_debug"},
+   "010": {"FONT_BIG": "TEXT_BIG"}
+  }
+ },
+ "constants": {
+  "canonical": {
+   "TEXT_CENTER": "(1 << 1)",
+   "TEXT_BIG": "(1 << 3)",
+   "TEXT_BORDER": "(1 << 17)",
+   "ENTITY_PLAYER": "0",
+   "ENTITY_ENEMY": "1",
+   "ENTITY_PICKUP": "2",
+   "STATE_TITLE": "0",
+   "STATE_PLAY": "1"
+  },
+  "headers": ["src_matched/GAME/include/Constants.h"],
+  "families": {"KEYBOARD": "SDLK", "FONT": "TEXT"},
+  "ignore": ["SDL_\\w+", "SDLK_\\w+"]
+ },
+ "headers": {
+  "include/Game.h": "game/Game.h",
+  "include/Renderer.h": "graphics/Renderer.h",
+  "include/Entity.h": "entity/Entity.h",
+  "include/Constants.h": "util/Constants.h"
+ },
+ "type_home": {
+  "Utf8Cursor": "util/Utf8.h",
+  "SaveHeader": "game/Settings.h"
+ },
+ "includes": ["#include <SDL.h>"],
+ "system_includes": {
+  "<string.h>": "\\b(memset|memcpy|memmove|memcmp|strlen|strcmp|strncmp|strcpy|strchr|strstr)\\s*\\(",
+  "<stdio.h>": "\\b(printf|fprintf|sprintf|snprintf|vsnprintf|FILE)\\b",
+  "<stdlib.h>": "\\b(rand|srand|malloc|calloc|realloc|free|exit|atoi|abs|qsort)\\b",
+  "<math.h>": "\\b(sinf?|cosf?|sqrtf?|floorf?|fabsf?|powf?)\\s*\\(",
+  "<string>": "\\bstd::string\\b",
+  "<vector>": "\\bstd::vector\\b"
+ },
+ "guard_prefix": "GAME_",
+ "banner": "From the matched units {units} of the game's decompilation.",
+ "thunk_symbols": "^\\?\\?__[EF]",
+ "thunk_names": "^(dynamic_initializer_for|dynamic_atexit_destructor_for)",
+ "dropped": {
+  "0x404d90": "implicit copy constructor: the compiler-generated one does the same"
+ },
+ "data": {
+  "pe": "work/game/Game.exe",
+  "symbols": [
+   {"base": "0x4a2000", "stride": 8, "count": 16, "expr": "glyphs[{i}]"}
+  ],
+  "items": [
+   {"name": "level_tiles", "va": "0x4b2000", "type": "int16", "dims": [30, 40], "width": 3,
+    "decl": "const short level_tiles[30][40]", "file": "world/Levels.cpp"},
+   {"name": "level_music", "va": "0x4b1000", "type": "int32", "count": 32, "per_line": 16, "width": 2,
+    "decl": "static const int level_music[32]", "file": "audio/Audio.cpp"},
+   {"name": "palette", "va": "0x4b1080", "type": "uint32", "count": 16, "per_line": 8, "format": "hex8",
+    "decl": "const unsigned int palette[16]", "file": "graphics/Renderer.cpp"},
+   {"name": "speeds", "va": "0x4b10c0", "type": "float32", "count": 4,
+    "decl": "static const float speeds[4]", "file": "entity/Player.cpp"},
+   {"name": "credits", "va": "0x4b10d0", "type": "cstr", "count": 12,
+    "decl": "const char* credits[12]", "file": "game/Credits.cpp"},
+   {"name": "button_glyphs", "va": "0x4b1100", "type": "ptr", "count": 4,
+    "decl": "const Glyph* button_glyphs[4]", "file": "input/Input.cpp"},
+   {"name": "spawn_points", "va": "0x4b1120", "type": "struct", "fields": ["uint16", "uint16", "bool", "int8:hex2"],
+    "stride": 6, "count": 8, "decl": "const SpawnPoint spawn_points[8]", "file": "world/Levels.cpp"},
+   {"name": "high_scores", "va": "0x4f0000", "type": "int32", "count": 10,
+    "decl": "int high_scores[10]", "file": "game/Game.cpp"}
+  ]
+ }
+}

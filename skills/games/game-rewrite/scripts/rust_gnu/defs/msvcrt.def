@@ -1,0 +1,8 @@
+LIBRARY msvcrt.dll
+EXPORTS
+    memcmp
+    memcpy
+    memmove
+    memset
+    strlen
+    wcslen
