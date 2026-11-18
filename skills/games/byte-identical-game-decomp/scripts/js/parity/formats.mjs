@@ -7,8 +7,9 @@
 //   node parity/formats.mjs [--root PROJECT] [--python python3] [--quick] [--only MODULE] [--keep] [--tmp DIR]
 //
 // Trees (PROJECT = the current directory by default): text on work/game, png on work/game and
-// extracted, wav on extracted, zip on work/game (data.zip and the GOG .hashdb). --quick: zip on the .hashdb
-// only (data.zip's 7-Zip deflate search takes Python about 13 minutes).
+// extracted, wav on extracted, zip on work/game (the game's ZIP archives and the GOG .hashdb). --quick: zip on the
+// .hashdb only (the 7-Zip deflate search of a large archive can take Python over ten minutes). Without
+// PROJECT/work/game the test stops with exit 2.
 // Cases, per (module, tree):
 //   verify      exit code, stderr, stdout and the report JSON except their "seconds" field (timing)
 //   per file    the decoded folder of the JS run is byte-identical to Python's (same files and directories);
@@ -20,7 +21,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { compareDirs, JS_DIR, Parity, parseOpts, SK } from '../lib/peparity.mjs'
+import { compareDirs, fail, JS_DIR, Parity, parseOpts, SK } from '../lib/peparity.mjs'
 import { parse } from '../lib/pyjson.mjs'
 
 const opts = parseOpts(process.argv.slice(2), { root: undefined, python: undefined, quick: false, only: undefined,
@@ -29,6 +30,7 @@ const P = new Parity('formats', opts)
 const t = (...p) => P.tmpPath(...p)
 const PY_FMT = join(SK, 'formats'), JS_FMT = join(JS_DIR, 'formats')
 
+if (!existsSync(P.path('work', 'game'))) fail('formats', `${P.path('work', 'game')} not found: run it from a decomp project (or pass --root PROJECT) whose work/game holds the game files`)
 let zipSrc = P.path('work', 'game')
 if (opts.quick) {          // a tree with the .hashdb only
   zipSrc = t('zip_quick')

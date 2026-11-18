@@ -6,9 +6,9 @@
  *   HARNESS_ENV_EXIT   "GAME_EXIT_FRAME"   HARNESS_ENV_FB "GAME_TRACE_FB"
  *   HARNESS_REPLAY_HEADER "GAME-REPLAY 1"   HARNESS_TRACE_HEADER "GAME-TRACE 1"
  *   HARNESS_KEYS_VK      key names map to Windows virtual-key codes (default: SDL2 keycodes)
- *   HARNESS_IO_CUSTOM    the unit provides harness_io_open/read/write/close and harness_getenv itself (the
- *                        VVVVVV oracle used SDL_RWFromFile and SDL_getenv: the original's static CRT had
- *                        no fopen, and the matched build links only what the original linked)
+ *   HARNESS_IO_CUSTOM    the unit provides harness_io_open/read/write/close and harness_getenv itself (e.g.
+ *                        an SDL game's oracle uses SDL_RWFromFile and SDL_getenv when the original's static
+ *                        CRT has no fopen: the matched build links only what the original linked)
  * The game-specific half (which fields, where the hooks are called, how held keys reach the game's input
  * state) stays in the game's own hook file. The calls, in the order of one logic frame:
  *   after every input poll:  n = harness_held(codes, HARNESS_MAX_HELD); overwrite the game's key state

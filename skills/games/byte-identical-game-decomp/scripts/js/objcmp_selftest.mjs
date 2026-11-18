@@ -471,15 +471,15 @@ function run(args) {
   let lines = ['// objcmp selftest sources', '']
   for (const f of funcs) {
     if (f.name === '?Update@CUnit@@QAEXXZ') {
-      lines.push(`// FUNCTION: VVVVVV 0x${f.va.toString(16)}`, 'void CUnit::Update()', '{', '}', '')
+      lines.push(`// FUNCTION: GAME 0x${f.va.toString(16)}`, 'void CUnit::Update()', '{', '}', '')
     } else if (f.name.startsWith('?Foo')) {
       continue
     } else if (f === funcs[4]) {
-      lines.push(`// FUNCTION: VVVVVV 0x${f.va.toString(16)} ${f.name}`, 'static int helper_with_other_name(int a) {', '}', '')
+      lines.push(`// FUNCTION: GAME 0x${f.va.toString(16)} ${f.name}`, 'static int helper_with_other_name(int a) {', '}', '')
     } else if (f === funcs[5]) {
       lines.push(`// FUNCTION: 0x${f.va.toString(16)}`, `int __stdcall ${f.name.slice(1)}(int a, int b) { return 0; }`, '')
     } else {
-      lines.push(`// FUNCTION: VVVVVV 0x${f.va.toString(16)}`, `int ${f.name.slice(1)}(void)`, '{', '    return 0;', '}', '')
+      lines.push(`// FUNCTION: GAME 0x${f.va.toString(16)}`, `int ${f.name.slice(1)}(void)`, '{', '    return 0;', '}', '')
     }
   }
   let gsym
@@ -489,13 +489,13 @@ function run(args) {
     if (hit) { gsym = hit.symbol; break }
   }
   if (gsym === undefined) throw new Error('StopIteration')
-  lines.push(`// GLOBAL: VVVVVV 0x${gmap.get(gsym).toString(16)}`, `extern int ${gsym.slice(1)};`, '',
-             '// GLOBAL: VVVVVV 0x4a0000', 'int g_counter = 0;', '',
-             '// VTABLE: VVVVVV 0x4b0000', 'class CUnit : public CBase {', '};', '',
+  lines.push(`// GLOBAL: GAME 0x${gmap.get(gsym).toString(16)}`, `extern int ${gsym.slice(1)};`, '',
+             '// GLOBAL: GAME 0x4a0000', 'int g_counter = 0;', '',
+             '// VTABLE: GAME 0x4b0000', 'class CUnit : public CBase {', '};', '',
              '// FUNCTION: OTHERMOD 0x401234', 'void other_module_function() {}', '')
   writeFileSync(pathJoin(src, 'game.cpp'), lines.join('\n'))
   const jout = pathJoin(work, 'report.json')
-  ;[rc, out] = cli('report', '--pe', args.pe, '--src', src, '--obj', objs.gy, '--module', 'VVVVVV', '--json', jout, '-q', ...fopt)
+  ;[rc, out] = cli('report', '--pe', args.pe, '--src', src, '--obj', objs.gy, '--module', 'GAME', '--json', jout, '-q', ...fopt)
   let rep = loadJson(jout)
   const sm = rep.get('summary')
   const expect = funcs.length - 2
@@ -510,10 +510,10 @@ function run(args) {
   check(`report maps GLOBAL ${gsym}, lists ${data.length} GLOBAL/VTABLE and skips the other module`,
         data.length === 3 && data.some((d) => d.get('symbol') === gsym) && relocsChecked >= 1 &&
         fns.every((f) => f.get('module') !== 'OTHERMOD'))
-  writeFileSync(pathJoin(src, 'bad.cpp'), `// FUNCTION: VVVVVV 0x${funcs[2].va.toString(16)}\nvoid Foo(int x) {\n}\n\n` +
-                `// FUNCTION: VVVVVV 0x${funcs[3].va.toString(16)}\nvoid Missing::Thing() {\n}\n\n` +
-                `// STUB: VVVVVV 0x${(funcs[3].va + 0x1000).toString(16)}\nvoid fn_00000000() {\n}\n`)
-  ;[rc, out] = cli('report', '--pe', args.pe, '--src', src, '--obj', objs.gy, '--module', 'VVVVVV', '--json', jout, '-q', ...fopt)
+  writeFileSync(pathJoin(src, 'bad.cpp'), `// FUNCTION: GAME 0x${funcs[2].va.toString(16)}\nvoid Foo(int x) {\n}\n\n` +
+                `// FUNCTION: GAME 0x${funcs[3].va.toString(16)}\nvoid Missing::Thing() {\n}\n\n` +
+                `// STUB: GAME 0x${(funcs[3].va + 0x1000).toString(16)}\nvoid fn_00000000() {\n}\n`)
+  ;[rc, out] = cli('report', '--pe', args.pe, '--src', src, '--obj', objs.gy, '--module', 'GAME', '--json', jout, '-q', ...fopt)
   rep = loadJson(jout)
   const st = new Map(rep.get('functions').map((f) => [f.get('va'), f.get('status')]))
   const rsum = rep.get('summary')

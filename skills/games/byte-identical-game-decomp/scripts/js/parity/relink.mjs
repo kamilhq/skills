@@ -2,11 +2,14 @@
 // Parity test: relink.py vs js/relink.mjs (phase 6 relink with link.exe: prepare, link, finish, check).
 //
 //   node parity/relink.mjs [--root PROJECT] [--python python3] [--cache ASM_CACHE] [--libdir SDK_LIB]
-//                          [--symbols-strict F] [--symbols-all F] [--module VVVVVV] [--skip-link] [--keep] [--tmp DIR]
+//                          [--symbols-strict F] [--symbols-all F] [--binary NAME] [--module NAME] [--obj DIR]
+//                          [--skip-link] [--keep] [--tmp DIR]
 //
-// PROJECT (default: the current directory) must hold work/game/<MODULE>.exe, reassembled/<MODULE>, decompiled_exe
-// (index.json, instructions.tsv) and, unless --symbols-* are given, what `hybrid_link.py map` needs (the maps are
-// made once by Python: strict, and --all). --cache: a reassemble.py assembler cache (copied for every run); made
+// PROJECT (default: the current directory) must have a decomp.json whose binary --binary (default: the first with
+// "matching": true) has its exe, its phase-5b text (reassembled), its decompile (index.json, instructions.tsv)
+// and, unless --symbols-* are given, what `hybrid_link.py map` needs (annotated sources, objects: --obj, default
+// <paths.build>/obj/<name>; --module, default the binary's name; the maps are made once by Python: strict, and
+// --all). Without them the test stops with exit 2 and says what is missing. --cache: a reassemble.py assembler cache (copied for every run); made
 // by one Python build when absent (slow). --libdir: the Windows SDK's Lib in the Wine prefix (default
 // $MSVC_PREFIX or ~/.wine-vs2010, drive_c/Program Files (x86)/Microsoft SDKs/Windows/v7.1/Lib).
 // Each side runs prepare/link/finish/check in the SAME out_dir path (renamed afterwards), one Wine link at a
@@ -27,20 +30,21 @@ import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 
 import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { compareDirs, Parity, parseOpts, SK } from '../lib/peparity.mjs'
+import { compareDirs, Parity, parseOpts, projectBinaries, SK } from '../lib/peparity.mjs'
 
 const opts = parseOpts(process.argv.slice(2), {
   root: undefined, python: undefined, cache: undefined, libdir: undefined, 'symbols-strict': undefined,
-  'symbols-all': undefined, module: 'VVVVVV', 'skip-link': false, keep: false, tmp: undefined,
+  'symbols-all': undefined, binary: undefined, module: undefined, obj: undefined, 'skip-link': false, keep: false, tmp: undefined,
 })
 const P = new Parity('relink', opts)
 const t = (...p) => P.tmpPath(...p)
-const M = opts.module
-const EXE = `work/game/${M}.exe`
+const BIN = projectBinaries(P.root, { script: 'relink', select: opts.binary, matching: !opts.binary })[0]
+const M = opts.module ?? BIN.name
+const EXE = BIN.exe, RE = BIN.reassembled, DEC = BIN.decompiled, SRC = BIN.src, OBJ = opts.obj ?? BIN.obj
 const LIB = opts.libdir ?? join(process.env.MSVC_PREFIX || join(homedir(), '.wine-vs2010'), 'drive_c', 'Program Files (x86)',
                                 'Microsoft SDKs', 'Windows', 'v7.1', 'Lib')
 const sha = (f) => createHash('sha256').update(readFileSync(f)).digest('hex')
-for (const p of [EXE, `reassembled/${M}`, 'decompiled_exe/index.json', 'decompiled_exe/instructions.tsv']) {
+for (const p of [EXE, RE, `${DEC}/index.json`, `${DEC}/instructions.tsv`]) {
   if (!existsSync(P.path(p))) {
     process.stdout.write(JSON.stringify({ script: 'relink', error: `missing ${P.path(p)} (use --root)` }) + '\n')
     process.exit(2)
@@ -53,12 +57,12 @@ const envOf = (s, extra = {}) => ({ TMPDIR: t(`tmp_${s}`), ...extra })
 let cache = opts.cache
 if (!cache) {
   cache = t('asm_cache.json')
-  P.run('py', ['build', `reassembled/${M}`, t('cache_build.bin'), '--cache', cache], { pyScript: `${SK}/reassemble.py` })
+  P.run('py', ['build', RE, t('cache_build.bin'), '--cache', cache], { pyScript: `${SK}/reassemble.py` })
 }
 let nc = 0
 const cacheCopy = () => { const f = t(`cache_${nc++}.json`); cpSync(cache, f); return f }
-const MAP = ['map', '--pe', EXE, '--src', `src_matched/${M}`, '--obj', 'src_matched/build', '--module', M,
-             '--functions', 'decompiled_named_exe/index.json', '--instructions', 'decompiled_exe/instructions.tsv']
+const MAP = ['map', '--pe', EXE, '--src', SRC, '--obj', OBJ, '--module', M,
+             '--functions', `${BIN.named}/index.json`, '--instructions', `${DEC}/instructions.tsv`]
 const maps = { strict: opts['symbols-strict'], all: opts['symbols-all'] }
 for (const [k, extra] of [['strict', []], ['all', ['--all']]]) {
   if (maps[k]) continue
@@ -117,7 +121,7 @@ const W = t('out')
 function side(s, name, prepArgs, { link = true, finish = false, map }) {
   rmSync(W, { recursive: true, force: true })
   const r = {}
-  r.prepare = P.run(s, ['prepare', `reassembled/${M}`, map, 'decompiled_exe', W, ...prepArgs, '--cache', cacheCopy()], { env: envOf(s) })
+  r.prepare = P.run(s, ['prepare', RE, map, DEC, W, ...prepArgs, '--cache', cacheCopy()], { env: envOf(s) })
   cpSync(W, t(`${name}_prep_${s}`), { recursive: true })
   if (link && !opts['skip-link']) {
     r.link = P.run(s, ['link', W, EXE], { env: envOf(s) })
@@ -127,7 +131,7 @@ function side(s, name, prepArgs, { link = true, finish = false, map }) {
       for (const f of ['facts.json', 'final.exe']) if (existsSync(join(W, f))) cpSync(join(W, f), t(`${name}_finsub_${s}`, f))
       r.finish = P.run(s, ['finish', W, EXE], { env: envOf(s) })
     }
-    r.check = P.run(s, ['check', W, EXE, map, 'decompiled_exe/instructions.tsv', 'decompiled_exe/index.json'], { env: envOf(s) })
+    r.check = P.run(s, ['check', W, EXE, map, `${DEC}/instructions.tsv`, `${DEC}/index.json`], { env: envOf(s) })
   }
   renameSync(W, t(`${name}_${s}`))
   return r
@@ -165,7 +169,7 @@ function both(name, args) {
   const a = P.run('py', args, { env: envOf('py') }), b = P.run('js', args, { env: envOf('js') })
   P.compare(name, a, b, { stderr: !a.stderr.toString().startsWith('Traceback') })
 }
-both('errors: --all map without --free', ['prepare', `reassembled/${M}`, maps.all, 'decompiled_exe', t('refused'), '--cache', cacheCopy()])
+both('errors: --all map without --free', ['prepare', RE, maps.all, DEC, t('refused'), '--cache', cacheCopy()])
 for (const args of [[], ['prepare'], ['prepare', 'a', 'b', 'c'], ['check', 'a'], ['link', 'a'], ['finish', 'a', 'b', 'c'],
                     ['bogus', 'a', 'b'], ['prepare', 'a', 'b', 'c', 'd', '--cache']]) {
   both(`errors: ${JSON.stringify(args)}`, args)

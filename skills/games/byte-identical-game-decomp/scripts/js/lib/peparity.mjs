@@ -4,7 +4,7 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { dumps } from './pyjson.mjs'
 
@@ -123,4 +123,53 @@ export function compareDirs(da, db, canon = null) {
   for (const f of fb) if (!sa.has(f)) diffs.push(`only js wrote ${f}`)
   for (const f of fa) if (sb.has(f)) diffs.push(...compareFile(join(da, f), join(db, f), canon))
   return diffs
+}
+
+// Stop a parity test that cannot run: one JSON line ({"script", "error"}) and exit 2.
+export function fail(script, message) {
+  process.stdout.write(JSON.stringify({ script, error: message }) + '\n')
+  process.exit(2)
+}
+
+// The binaries of the project at `root`, for the parity tests that run on a real game. Nothing game-specific is
+// built in: they come from PROJECT/decomp.json ("binaries", "paths"), with the same defaults as pipeline.py
+// (decompiled_<stem>, decompiled_named_<stem>, reassembled/<name>, <paths.src>/<name>, <paths.build>/obj/<name>).
+// Every path is returned relative to root (the tests run the tools from there) and absolute ("abs").
+// select: a binary's name, file or file stem (--binary); matching: only binaries with "matching": true.
+// required: without decomp.json, or with no binary left, the test stops with exit 2 and says what it needs;
+// otherwise [] is returned (the test skips its real-data cases).
+export function projectBinaries(root, { script, select, matching = false, required = true } = {}) {
+  const cfgPath = join(root, 'decomp.json')
+  const need = `needs a decomp project: run it from the project folder or pass --root PROJECT (a folder with decomp.json ` +
+    'listing "binaries" and the phase outputs they need); nothing game-specific is built into the test'
+  if (!existsSync(cfgPath)) {
+    if (required) fail(script, `${cfgPath} not found: ${need}`)
+    return []
+  }
+  let cfg
+  try { cfg = JSON.parse(readFileSync(cfgPath, 'utf8')) } catch (e) { fail(script, `${cfgPath}: ${e.message}`) }
+  const paths = { game: 'work/game', src: 'src_matched', build: 'build', analysis: 'analysis', ...(cfg.paths || {}) }
+  const rel = (p) => relative(root, resolve(root, p)) || '.'
+  let out = (cfg.binaries || []).filter((b) => b && b.file).map((b) => {
+    const stem = basename(b.file).replace(/\.[^.]*$/, '')
+    const name = b.name || stem
+    const low = stem.toLowerCase()
+    const r = {
+      name, file: b.file, stem, matching: Boolean(b.matching),
+      exe: rel(join(paths.game, b.file)),
+      decompiled: rel(b.decompiled || `decompiled_${low}`),
+      named: rel(b.named || `decompiled_named_${low}`),
+      reassembled: rel(b.reassembled || `reassembled/${name}`),
+      src: rel(b.src || join(paths.src, name)),
+      obj: rel(join(paths.build, 'obj', name)),
+    }
+    r.abs = Object.fromEntries(['exe', 'decompiled', 'named', 'reassembled', 'src', 'obj'].map((k) => [k, resolve(root, r[k])]))
+    return r
+  })
+  if (select) out = out.filter((b) => [b.name, b.file, b.stem].includes(select))
+  if (matching) out = out.filter((b) => b.matching)
+  if (!out.length && required) {
+    fail(script, `${cfgPath} lists no ${matching ? 'matching ' : ''}binary${select ? ` named ${select}` : ''}: ${need}`)
+  }
+  return out
 }

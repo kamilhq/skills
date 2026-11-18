@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Parity test: pipeline.py vs js/pipeline.mjs (the runner: every phase from decomp.json).
 //
-//   node parity/pipeline.mjs [--root PROJECT] [--python python3] [--quick] [--only NAME[,NAME]] [--run] [--keep]
-//                            [--tmp DIR]
+//   node parity/pipeline.mjs [--root PROJECT] [--python python3] [--quick] [--only NAME[,NAME]] [--run]
+//                            [--save-dir DIR] [--keep] [--tmp DIR]
 //
 // PROJECT (default: the current directory) is a project with decomp.json at its root and its phase results
-// (VVVVVV: work/game, extracted, decoded, decompiled_*, analysis, reassembled, src_matched, tools/formats and
+// (e.g. work/game, extracted, decoded, decompiled_*, analysis, reassembled, src_matched, tools/formats and
 // tools/js/formats, reports/game, reports/extracted). Nothing in PROJECT is written: each scenario builds a
 // temp project TMP/proj whose input folders are symlinks into PROJECT (src_matched/<B> and the module reports
 // are copied: the compiler's cwd must be a real folder, and decode/completeness rewrite reports) and whose
@@ -35,22 +35,23 @@
 //   features     features (both binaries) into an empty analysis folder
 //   names        names without names_apply.json (rows report it; Ghidra is not started), recover --binary nope
 //   match        match (the whole project), match --units with SHOW_STUBS=1, status
-//   build        build --mode identical (the full data build: Python packs data.zip in about 6 minutes; with
+//   build        build --mode identical (the full data build: Python may take minutes to pack an archive; with
 //                --quick: --skip-data into a build folder holding the game's data files), then
 //                build --mode identical --skip-data --no-original (+ --run with --run), verify, verify --out
 //                missing (refused), status
-// --run: the game is started under Wine by both sides (~/Documents/VVVVVV is backed up and restored).
+// --run: the game is started under Wine by both sides; --save-dir DIR (the folder the game writes its settings and
+// saves to, e.g. under ~/Documents) is backed up first and restored if the runs changed it.
 // Prints one JSON summary (with per-command cases and seconds); exit 0 only when every case is identical.
 import { spawnSync } from 'node:child_process'
 import { constants, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync,
   writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { Parity, parseOpts, SK, compareDirs, firstDiff } from '../lib/peparity.mjs'
 import { dumps, parse } from '../lib/pyjson.mjs'
 
 const opts = parseOpts(process.argv.slice(2), { root: undefined, python: undefined, quick: false, only: undefined,
-  run: false, keep: false, tmp: undefined })
+  run: false, 'save-dir': undefined, keep: false, tmp: undefined })
 const P = new Parity('pipeline', opts)
 const ROOT = P.root
 const PROJ = P.tmpPath('proj')
@@ -237,9 +238,10 @@ function seedCache(b) {
 }
 
 // --run: the save folder of the game must end as it was
-const SAVE = join(homedir(), 'Documents', 'VVVVVV')
+const SAVE = opts['save-dir'] ? resolve(opts['save-dir'].replace(/^~(?=\/|$)/, homedir())) : null
 let saveBackup = null
-if (opts.run && existsSync(SAVE)) {
+if (opts.run && !SAVE) P.notes.push('--run without --save-dir: the game\'s own save folder is not backed up')
+if (opts.run && SAVE && existsSync(SAVE)) {
   saveBackup = t('save_backup')
   cpSync(SAVE, saveBackup, { recursive: true, preserveTimestamps: true })
 }
@@ -255,13 +257,13 @@ scenario('status_root', { noProject: true }, [{ args: ['--project', ROOT, 'statu
   name: 'status on PROJECT' }])
 
 scenario('init', { noProject: true }, [
-  { args: ['init', '--game', 'VVVVVV 2.4.4'], stderr: true, name: 'init in a missing folder' },
+  { args: ['init', '--game', 'Game 1.0'], stderr: true, name: 'init in a missing folder' },
   { args: ['init', '--game', 'Other'], stderr: true, name: 'init again (refused)' },
   { args: ['init', '--force', '--game', 'Other 1.0'], stderr: true, name: 'init --force' },
   { args: ['status'], stderr: true, name: 'status of the new skeleton' },
 ])
 scenario('init', { links: ['work/game'], cfg: false, files: { '.gitignore': '/build/\n# local\n*.log' } }, [
-  { args: ['init', '--game', 'VVVVVV 2.4.4'], stderr: true, name: 'init with a game folder and a .gitignore' },
+  { args: ['init', '--game', 'Game 1.0'], stderr: true, name: 'init with a game folder and a .gitignore' },
   { args: ['status'], stderr: true, name: 'status (game folder, no manifest, binaries listed)' },
 ])
 
@@ -365,7 +367,7 @@ if (saveBackup) {
     rmSync(SAVE, { recursive: true, force: true })
     cpSync(saveBackup, SAVE, { recursive: true, preserveTimestamps: true })
   }
-  P.notes.push(`~/Documents/VVVVVV ${same ? 'unchanged by the runs' : 'changed by the game runs: restored from the backup'}`)
+  P.notes.push(`${SAVE} ${same ? 'unchanged by the runs' : 'changed by the game runs: restored from the backup'}`)
 }
 const r2 = (x) => Math.round(x * 100) / 100
 const perCommand = {}

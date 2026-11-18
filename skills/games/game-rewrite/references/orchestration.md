@@ -1,17 +1,17 @@
 # Orchestration: splitting the rewrite across agents
 
 A rewrite is days of agent work. One coordinator (the session the user talks to) plans, briefs agents, merges
-and **verifies**; the agents do the work in bounded, checkable pieces. This file is the plan that took
-VVVVVV 2.4.4 from a matched decomp to a C++ and a Rust rewrite, both identical to the original in all 19
-scenarios, and what went wrong on the way.
+and **verifies**; the agents do the work in bounded, checkable pieces. This file is the plan that took an
+SDL2 game of about a thousand game functions from a matched decomp to a C++ and a Rust rewrite, both
+identical to the original in about twenty scenarios, and what went wrong on the way.
 
 ## 1. The sequence
-| # | Agent | Input | Output | Parallel? | VVVVVV wall time |
+| # | Agent | Input | Output | Parallel? | Wall time seen |
 |---|---|---|---|---|---|
 | 1 | toolchain | inventory (step 1) | `libraries.json`, both flavours of the libraries, both hello programs `RESULT: OK` | alone | not recorded |
 | 2 | harness / oracle | matched main loop, the toolchain | `HOOKS.md`, the oracle, 3 scenarios, determinism proven (3 runs each) | alone | about 7 h (includes hours the Mac slept, section 8) |
-| 3 | C++ consolidation | matched units, oracle | the C++ rewrite: 976 functions, builds with VS2010, 3 scenarios identical | **one agent** | about 1 h |
-| 4a | scenario widening (+ C++ fixes) | oracle, C++ rewrite | 16 more scenarios (19), fuzz generator, own test levels; C++ corrected where they diverged | parallel with 4b | about 1.75 h |
+| 3 | C++ consolidation | matched units, oracle | the C++ rewrite: every game function, builds with the original compiler, 3 scenarios identical | **one agent** | about 1 h |
+| 4a | scenario widening (+ C++ fixes) | oracle, C++ rewrite | about 16 more scenarios, fuzz generator, own test levels; C++ corrected where they diverged | parallel with 4b | about 1.75 h |
 | 4b | Rust foundation | C++ rewrite, toolchain | the crate: skeleton (one stub per function), `Cx`, state structs, `ffi/`, harness, main loop, maths; builds | parallel with 4a | not recorded |
 | 5 | Rust waves (8) | foundation, C++ rewrite, `BRIEF.md` | each: its modules translated in a private copy of the crate, `WAVE_NOTES.md` | **8 in parallel** | 13-25 min each |
 | 6 | integration | the 8 copies, WAVE_NOTES, the corrected C++ | one crate, no stub, builds, all scenarios identical, extra runs against the C++ | alone | about 2 h |
@@ -34,8 +34,8 @@ work that only reads shared state (scenario authoring next to the Rust foundatio
 **Before the waves (the foundation agent):** the crate builds with a stub for every function
 (`rust.md` section 11), and everything shared is written and pinned: `Cx`, every state struct with all
 fields, the enums, `ffi/` for every library, the harness module, the C numerics, the main loop. A wave that
-must change shared state records it (below); pinning first keeps those changes rare (VVVVVV: 3 state files
-were edited by more than one wave, all resolvable).
+must change shared state records it (below); pinning first keeps those changes rare (in the validated run 3
+state files were edited by more than one wave, all resolvable).
 
 **The brief** (`rewrite/rust_wave/BRIEF.md`, one file for all waves, plus a short task per wave naming its
 modules). It says:
@@ -58,18 +58,18 @@ modules). It says:
 - risky spots: where exact behaviour is uncertain (uninitialised locals, out-of-bounds reads, float spots).
 
 **Sizes.** Split by module ownership, then balance by function count and difficulty; one big state machine
-is a wave's main job on its own. VVVVVV's 936 stubs:
+is a wave's main job on its own. A split of about 950 stubs that worked:
 
 | Wave | Modules | Functions |
 |---|---|---|
-| graphics | graphics (3 files), screen | 174 |
-| sys | music, sound, filesystem, xml, utility, network, glitchrunner, defer, level_debugger, vlog | 146 |
-| loc | localization, font, bidi, vformat, utf8, textbook, buttonglyphs, roomname_translator | 130 |
-| editor | editor, customlevels (+ their tables) | 125 |
+| graphics | renderer (3 files), screen | 174 |
+| sys | music, sound, filesystem, xml, utilities, platform services, logging | 146 |
+| loc | localization, font, bidi, string formatting, utf8, glyph tables | 130 |
+| editor | level editor, user levels (+ their tables) | 125 |
 | game | game (5 files: state machine, menus, saves, settings, text boxes) | 117 |
-| entity | entity, textbox | 92 |
+| entity | entities, text boxes | 92 |
 | mapscript | map (+ room tables), script (+ built-in scripts) | 68 |
-| gameloop | render, logic, input, keypoll | 66 |
+| gameloop | render, logic, input, input polling | 66 |
 | (foundation) | main loop (18), maths and logging (15, hand-written) | 33 |
 
 Each wave took 13 to 25 minutes. Stubs keep every copy building, so no wave waits for another; a wave that
@@ -78,16 +78,16 @@ calls a stub of another wave gets `Default` until the merge.
 ## 4. Integration
 1. Files only one wave changed: copy from that wave (its modules, its generators, its new `ffi/` files).
 2. Files several waves changed (shared state): three-way merge against the foundation
-   (`git merge-file mine base theirs`, one wave after the other). VVVVVV: 3 files; two waves had added the
-   same field with the same type, merged once; the rest merged cleanly.
-3. Build. The errors are the signature changes of WAVE_NOTES meeting callers in other waves: VVVVVV had 23
+   (`git merge-file mine base theirs`, one wave after the other). In the validated run: 3 files; two waves
+   had added the same field with the same type, merged once; the rest merged cleanly.
+3. Build. The errors are the signature changes of WAVE_NOTES meeting callers in other waves: about two dozen
    errors, all of that kind (a function that gained `cx`, an `Option` return, a slice instead of a pointer).
    Fix the callers to the new signature.
 4. Run every scenario (`--ignore fb` first, then with `fb`), compare the save folders. Work each divergence
-   (section 5). VVVVVV: 3 behaviour fixes, all found by the harness:
+   (section 5). The validated run needed 3 behaviour fixes, all found by the harness:
    - two functions decremented the wrong timers: members misnamed in a matched unit's class copy, inherited
      from the C++ rewrite before the C++ was corrected (`rust.md` section 9); seen as `fb` from frame 1408
-     in the flip-mode scenario;
+     in one play mode's scenario;
    - a clamp macro that evaluates its random argument up to three times was translated as one evaluation
      (`rust.md` section 6); seen as `fb` in an editor fuzz run while its menu was open.
 5. Update `DESIGN.md` / `README.md`: no placeholders left, deviations, results.
@@ -107,20 +107,20 @@ Three programs play the same replay: the oracle, the C++ rewrite, the Rust rewri
    not the oracle), then remove them.
 
 **Rewrite against rewrite.** Code no oracle scenario reaches can be checked cheaply by running random input
-through both rewrites and comparing (no oracle recording needed). VVVVVV: 40 replays (5 main-game
-playthroughs, 8 play-mode prefixes + random input, 3 own levels, 9 editor fuzz runs, 12 languages; about
+through both rewrites and comparing (no oracle recording needed). Example: 40 replays (main-game
+playthroughs, play-mode prefixes + random input, own levels, editor fuzz runs, every language; about
 140,000 frames), 39 identical, the 40th quitting by itself in both. These runs found the clamp bug. Their
 limit: both rewrites can share a bug (the misnamed timers matched between them until an oracle scenario
 showed it), so they widen coverage but do not replace oracle scenarios.
 
 ## 6. Widening the scenarios
 Three scenarios prove the loop; they do not prove the game. Before the Rust waves end, widen:
-- **every mode and menu**: play modes (time trials, no-death mode, flip mode, intermissions), options
+- **every mode and menu**: play modes (time trials, challenge and assist modes, bonus levels), options
   (gameplay, graphics, accessibility toggles), credits and the ending, every language family the game ships
   (right-to-left, CJK);
 - **fuzz with prefixes**: a seeded generator (`random.Random(seed)`) writes replays: a fixed prefix (menus
   that unlock modes and start a level) then random walks, jumps, map and pause menus for thousands of frames.
-  Seeds are scenario names; keep only seeds that reach new places (`gen_fuzz.py summary` lists rooms, states,
+  Seeds are scenario names; keep only seeds that reach new places (a project `gen_fuzz.py summary` listing rooms, states,
   deaths);
 - **own test levels**: levels the harness writes itself (no game content) that exercise every entity type
   and script command, loaded from the level list or a command-line option;
@@ -139,15 +139,15 @@ Pitfalls seen:
   switch it off in the scenario;
 - the game may quit by itself under random input (a menu option): cut the replay or bias the input.
 
-Record every new scenario with `record_oracle.py --runs 2` (or 3); all runs byte-identical. VVVVVV: 16 new
-scenarios (951 to 5,001 frames), 19 in all, every one deterministic. The widening agent also fixed the C++
-rewrite where a new scenario diverged (the misnamed timers, seen in three scenarios).
+Record every new scenario with `record_oracle.py --runs 2` (or 3); all runs byte-identical. In the validated
+run: 16 new scenarios (about 1,000 to 5,000 frames), every one deterministic. The widening agent also fixed
+the C++ rewrite where a new scenario diverged (the misnamed timers, seen in three scenarios).
 
 ## 7. Independent verification
-The coordinator does not trust reports, its own agents' included. After the VVVVVV integration it re-ran
-the decisive checks itself:
+The coordinator does not trust reports, its own agents' included. After the integration it re-runs the
+decisive checks itself:
 - clean rebuilds of both rewrites from an empty target folder;
-- all 19 scenarios with both exes, traces compared with `cmp` and `compare_traces.py`, save folders with
+- every scenario with both exes, traces compared with `cmp` and `compare_traces.py`, save folders with
   `diff -r`;
 - a checksum of the user's real save folder before and after all runs (unchanged: every run uses a scratch
   base folder).
@@ -169,16 +169,16 @@ touched). Tell the user what was re-run and what was only reported by an agent.
 | a report says "identical" | it was a different build, or `--ignore fb` | the coordinator re-runs the checks itself (section 7) |
 
 Runs per scenario took 10 to 30 s under Wine with replay (plus retries): budget a few minutes per exe for
-19 scenarios run one after the other, less with one Wine prefix per parallel run.
+twenty scenarios run one after the other, less with one Wine prefix per parallel run.
 
-## 9. Sizes of the validated case
+## 9. Sizes to expect (an SDL2 game of about 3,300 functions)
 | | |
 |---|---|
-| inventory | 3,253 functions in the exe: about 1,240 game, 860 in seven libraries, 1,160 CRT / compiler |
-| oracle | 4 main-loop functions edited, 1,199 identical + 12 NONMATCHING kept; 3 scenarios, then 19 (951-5,001 frames) |
-| C++ rewrite | 976 functions + WinMain, 60 `.cpp` + 49 `.h`, about 80,600 lines, VS2010 SP1, about 1 h of agent time |
-| Rust rewrite | 936 functions from stubs + 15 by hand, 31 modules, about 78,500 lines (27,000 generated), 8 waves of 13-25 min, integration about 2 h |
-| result | both rewrites identical to the oracle in all 19 scenarios, framebuffer hash and saves included; 39 of 40 extra Rust-vs-C++ replays identical (the 40th quits early in both) |
+| inventory | about a third of the exe's functions game code, a quarter in seven libraries, the rest CRT / compiler |
+| oracle | 4 main-loop functions edited, every other matched function kept; 3 scenarios, then about 20 (1,000-5,000 frames) |
+| C++ rewrite | about a thousand functions + WinMain, about 110 files, about 80,000 lines, the original compiler, about 1 h of agent time |
+| Rust rewrite | about 950 functions (almost all from stubs), about 30 modules, about 80,000 lines (a third generated), 8 waves of 13-25 min, integration about 2 h |
+| result | both rewrites identical to the oracle in every scenario, framebuffer hash and saves included; extra Rust-vs-C++ fuzz replays identical |
 
 ## Checklist
 - [ ] Machine kept awake; one Wine prefix per concurrent run.

@@ -26,7 +26,7 @@ Output layout (identical to innoextract --gog):
   {tmp}\xx\yy\<md5> entries plus before_install/after_install/check_if_install
   script calls; those are reassembled (part MD5s, whole-file MD5 verified) and
   written to the relative path GOG gives, i.e. the GAME FILES ARE AT <out_dir>/
-  (e.g. <out_dir>/VVVVVV.exe, <out_dir>/DATA/...). __redist/... (redistributables,
+  (e.g. <out_dir>/Game.exe, <out_dir>/DATA/...). __redist/... (redistributables,
   e.g. __redist/ISI/scriptinterpreter.exe, __redist/DirectX/*.cab) also comes from
   Galaxy "dependency" entries.
   Plain Inno entries keep their constant as a folder name: {app}\x -> app/x (on GOG

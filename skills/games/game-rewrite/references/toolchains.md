@@ -8,23 +8,23 @@ data and runs on Windows** (on the user's PC, or under Wine while developing on 
 
 | Language | Developing on Windows (the user's PC) | Developing on macOS / Linux |
 |---|---|---|
-| C++ | the original compiler family if matched units exist (VVVVVV: VS2010 SP1), else current MSVC or clang-cl | the same compilers under Wine, through the decomp skill's `msvc.sh` |
+| C++ | the original compiler family if matched units exist (e.g. VS2010 SP1), else current MSVC or clang-cl | the same compilers under Wine, through the decomp skill's `msvc.sh` |
 | Rust | `i686-pc-windows-msvc` (or `x86_64-pc-windows-msvc`) with the Visual Studio Build Tools linker | `i686-pc-windows-gnu`, linked by the Rust toolchain's own `rust-lld`, no MinGW: `scripts/rust_build.sh` |
 
-The user's target is a Windows PC. Developing under Wine is a convenience for this machine, not the goal:
+The target is a Windows exe. Building and testing under Wine on macOS or Linux is a convenience, not the goal:
 everything must also build and run natively on Windows (`runner: native`, `cl_mode: native`).
 
 ### C++: which compiler
 - **Matched units exist (decomp phase 6):** use the original compiler. The matched source compiles as it is,
   and the generated code behaves like the original's, including the parts no trace field shows: x87 versus
-  SSE2 float code, evaluation order, STL algorithms and container growth, CRT `rand()`. VVVVVV: VS2010 SP1
-  (`cl` 16.00.40219.01, `_MSC_VER` 1600) from Windows SDK 7.1 plus the KB2519277 compiler update
+  SSE2 float code, evaluation order, STL algorithms and container growth, CRT `rand()`. For a VS2010 SP1
+  game: `cl` 16.00.40219.01 (`_MSC_VER` 1600) from Windows SDK 7.1 plus the KB2519277 compiler update
   (install steps: decomp skill `matching-decomp.md` 1b).
 - **No matched units, or the user wants a modern compiler:** current MSVC or clang-cl. Then expect float
   differences and check them with the harness (step 5). VS2010 compiles 32-bit float code for x87 by
   default (no `/arch` flag); VS2012 and later default to SSE2. Use `/arch:IA32` on x86 to stay with x87,
   or accept that some `v=` fields will diverge and fix the code that depends on the extra precision.
-- Old compilers are C89 for C files. A C99 library (VVVVVV: c-hashmap) is compiled by clang
+- Old compilers are C89 for C files. A C99 library (e.g. c-hashmap) is compiled by clang
   `--target=i686-pc-windows-msvc -fms-compatibility-version=16.00 -fms-runtime-lib=static -fno-addrsig`
   against the old MSVC headers; its objects link with the old `link.exe` (`-fno-addrsig` keeps them plain).
   `build_libs.py` does this for `"lang": "c99"`.
@@ -97,8 +97,8 @@ agreed (name the files, the source and the sizes). A library without a pinned di
 `unpinned` and fails the command until the digest is written into `libraries.json`.
 
 Outputs under `rewrite/third_party/build/`: `static/{lib,include,bin}`, `dll/{bin,lib,include}`,
-`rust-gnu/{rtlib,defs}`. VVVVVV: both flavours in about 20 s under Wine; DLL export counts physfs 108,
-FAudio 62, lodepng 73, tinyxml2 52, SheenBidi 46, c_hashmap 8, stb_vorbis 18.
+`rust-gnu/{rtlib,defs}`. Seven libraries built both flavours in about 20 s under Wine; check each DLL's
+export count against the API the game uses (`wintools.py`).
 
 ### libraries.json
 ```json
@@ -128,14 +128,14 @@ FAudio 62, lodepng 73, tinyxml2 52, SheenBidi 46, c_hashmap 8, stb_vorbis 18.
 | `generate` (top level) | headers written into both include folders: configured wrappers such as `lodepng_c.h` |
 
 Paths in a library entry are relative to its source folder; `{src}`, `{build}`, `{project}` and `{skill}`
-(this skill's `scripts/`) start other roots. `scripts/examples/libraries_vvvvvv.json` is the complete
-file of the validated case (nine entries, including the SDL2 devel zip as `prebuilt` and the upstream
-stb_vorbis kept only as provenance).
+(this skill's `scripts/`) start other roots. `scripts/examples/libraries_example.json` is a complete file
+for an SDL2 game (nine entries, including the SDL2 devel zip as `prebuilt` and the upstream stb_vorbis kept
+only as provenance).
 
 Build settings from the original: `/MT` (static CRT), `/O2`, `/GS` (the original has security cookies),
 the library's own feature defines as read from the binary, and its export macro where the original exe
-exported the API (VVVVVV.exe exports PhysFS, FAudio and stb_vorbis; a C++ rewrite linked with the static
-libraries exports them too).
+exported the API (an exe that exports PhysFS, FAudio and stb_vorbis built them with their export macros;
+a C++ rewrite linked with the static libraries exports them too).
 
 ## C++ programs: `cpp_build.py`
 ```bash
@@ -144,7 +144,7 @@ python3 -I $S/cpp_build.py --out build/hello-cpp/hello.exe --subsystem windows h
 cl `/nologo /c /MT /GS /W3 /O2` (or `rewrite.toolchain.cflags`), one cl run per language (a Wine process
 start costs about a second), link `/OPT:REF /OPT:ICF /DYNAMICBASE /NXCOMPAT` with every library of
 `libraries.json` and the system libraries. `--subsystem windows` keeps `main()` as the entry
-(`/ENTRY:mainCRTStartup`). Header rules learned on VVVVVV:
+(`/ENTRY:mainCRTStartup`). Header rules learned the hard way:
 - include the generated configured header (`lodepng_c.h`), not the library's raw header, when the raw one
   pulls in C++ (lodepng.h without `LODEPNG_NO_COMPILE_CPP` includes `<vector>`, which breaks inside
   `extern "C"`);
@@ -156,32 +156,32 @@ start costs about a second), link `/OPT:REF /OPT:ICF /DYNAMICBASE /NXCOMPAT` wit
 CARGO_TARGET_DIR=build/hello-rust/target sh $S/rust_build.sh --release --manifest-path hello/rust/Cargo.toml
 ```
 No crates: every external function is a hand-written `extern "C"` block. Profiles set `panic = "abort"`.
-Checked in the VVVVVV hello: threads, `Mutex`, `thread_local!` destructors, `std::env::args`, `Instant`,
+Checked in a hello program this way: threads, `Mutex`, `thread_local!` destructors, `std::env::args`, `Instant`,
 `sleep`. Not tried: `raw-dylib` data imports, stdcall imports.
 
 ## The hello program (the gate)
 One small program per language that touches every library through the game's own files:
 
-| Library | VVVVVV hello check |
+| Library | Hello check (example: an SDL2 game) |
 |---|---|
-| SDL2 | linked version 2.30.0, window with a title, renderer, a texture shown |
-| PhysFS | mount the game's `data.zip`, read files from it |
-| lodepng | decode a game PNG (320x240 RGBA), FNV-1a of the pixels |
-| tinyxml2 | parse a game level: root element, attributes, element counts |
-| stb_vorbis | open every one of the 16 music tracks, decode one fully (393,750 samples), peak value |
-| FAudio | engine, mastering and source voice, samples played after 1-4 s (about 43,000 per second) |
+| SDL2 | linked version, window with a title, renderer, a texture shown |
+| PhysFS | mount the game's data archive, read files from it |
+| lodepng | decode a game PNG, FNV-1a of the pixels |
+| tinyxml2 | parse a game XML file: root element, attributes, element counts |
+| stb_vorbis | open every music track, decode one fully (sample count), peak value |
+| FAudio | engine, mastering and source voice, samples played after 1-4 s (about the output rate per second) |
 | SheenBidi | runs of a mixed Hebrew/Latin string |
 | c-hashmap | set, get, iterate |
 
 Rules: log every step to a file next to the exe, end with `RESULT: OK (0 failure(s))`, exit 0. Cross-check
-the numbers independently (VVVVVV: Python decoded the same PNG with zlib + Adam7 to the same FNV-1a, read the
-Ogg granule positions for the sample count, counted the XML elements with grep). Both languages must print
+the numbers independently (e.g. decode the same PNG with Python's zlib + Adam7 to the same FNV-1a, read the
+Ogg granule positions for the sample count, count the XML elements with grep). Both languages must print
 the same values; the hello is the first place where a mis-pinned or mis-built library shows (the plain
 stb_vorbis failed here).
 
 ## Running: Wine or Windows
 `scripts/run_wine.py EXE --title T --log NAME --expect "RESULT: OK" [--extra-dir <build>/dll/bin]` copies the
-game folder to a temporary folder (APFS clones on macOS: the 61 MB archive costs nothing), adds the exe and
+game folder to a temporary folder (APFS clones on macOS: large archives cost nothing), adds the exe and
 DLLs, runs it, waits for the window title, collects the log, retries.
 
 | | Under Wine (macOS/Linux) | On Windows |
@@ -192,10 +192,10 @@ DLLs, runs it, waits for the window title, collects the log, retries.
 | window check | CoreGraphics window list (no screen-recording permission) | `EnumWindows` |
 | start-up | crashes and hangs at random (below): retry | no such problems seen; one try should do |
 
-Observed under Wine 11 on macOS (VVVVVV, 2026):
-- Starting processes crash or hang at random: `Unhandled page fault on read access to 00004DC9 at address
-  7BF2123D`, exit codes 5 and 41, or a window that never finishes. The original `VVVVVV.exe` crashed the
-  same way in 3 of 5 runs, so it is the environment, not the build. In one session the Rust hello passed in
+Observed under Wine 11 on macOS (an SDL2 game, 2026):
+- Starting processes crash or hang at random: `Unhandled page fault on read access to ...`, exit codes 5
+  and 41, or a window that never finishes. The original game exe crashed the same way in 3 of 5 runs, so
+  it is the environment, not the build. In one session the Rust hello passed in
   1 of 7 starts with DLLs that differed from a passing set only in their timestamps.
   `run_wine.py` and `run_scenario.py` retry; judge a build only after several tries.
 - Audio needs the Mac awake: with the screen locked, SDL's audio thread stalled after one callback for
@@ -214,7 +214,7 @@ Observed under Wine 11 on macOS (VVVVVV, 2026):
   (Wine: "unimplemented function kernel32.dll._TlsAlloc@0").
 - A DLL's `.exp` and an exe's `.lib`/`.exp` (written when objects carry `dllexport`) are deleted by the
   scripts.
-- The release `SDL2.dll` and the game's `SDL2.dll` were different builds of the same version: run with the
+- The release `SDL2.dll` and a game's `SDL2.dll` can be different builds of the same version: run with the
   game's.
 
 ## Project config (decomp.json "rewrite", build part)
@@ -229,5 +229,5 @@ Observed under Wine 11 on macOS (VVVVVV, 2026):
 | `toolchain.cflags`, `toolchain.syslibs`, `toolchain.vs_include` | see cpp_build.py | C++ programs; clang `-isystem` folders |
 | `game`, `runner`, `wineprefix`, `extra_env` | `paths.game`, by platform, `~/.wine`, none | run_wine, run_scenario |
 
-Tested versions (VVVVVV): VS2010 SP1 `cl` 16.00.40219.01 with SDK 7.1, Apple clang 21, Rust 1.100.0 with its
+Tested versions: VS2010 SP1 `cl` 16.00.40219.01 with SDK 7.1, Apple clang 21, Rust 1.100.0 with its
 `rust-lld`, Wine 11.0, Python 3.9 and Node 26.

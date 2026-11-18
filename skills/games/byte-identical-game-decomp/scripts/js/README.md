@@ -46,7 +46,7 @@ parsing, usage/help/error text), `lib/pytools.mjs` and `lib/pycompat.mjs` (repr,
 functions, codecs). The ports were written in parallel, so these overlap; merging them is a cleanup for later
 and must keep every parity test passing.
 
-Project tools follow the same pattern in the project (VVVVVV: `tools/js/` - `match.mjs`, `match_all.mjs`,
+Project tools follow the same pattern in the project (e.g. `tools/js/` - `match.mjs`, `match_all.mjs`,
 `build_game.mjs`, `verify.mjs`, `extract_archives.mjs`, `completeness.mjs`, `formats/fmt_*.mjs`).
 
 ## Parity tests
@@ -79,6 +79,6 @@ data: they take the paths from arguments or from the project layout described in
 - **Timestamps:** on macOS, `utimes` has microsecond resolution; Python sets nanoseconds. Installers so far
   store whole seconds.
 - **Speed:** the pure-JS LZMA and bzip2 decoders are about 4x slower than Python's C libraries (installer
-  extraction overall takes about the same time). Everything else is as fast or much faster: on VVVVVV, the
-  7-Zip deflate of data.zip takes 6 s instead of 6 min, PNG re-encoding is 18x faster, and a full game build
+  extraction overall takes about the same time). Everything else is as fast or much faster: on one game, the
+  7-Zip deflate of its 60 MB data archive took 6 s instead of 6 min, PNG re-encoding is 18x faster, and a full game build
   (tools/js/build_game.mjs) takes about 4.5 min instead of 10.

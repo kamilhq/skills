@@ -18,7 +18,7 @@ Paths given to the program are Wine paths (Z:\\...) under --runner wine (default
 paths under native (default on Windows). The exit frame comes from --exit-frame or a "#! exit_frame=N" line
 of the scenario. A scenario can also carry
   "#! seed=<path in the basedir>:<file, relative to the scenario's folder>"  copied into the fresh basedir
-                                       before every try (test levels, a settings or unlock file)
+                                       before every try (test levels, a settings or save file)
   "#! arg=<argument>"                  one program argument per line, after rewrite.args and before --arg
 A try counts when the trace has the header (rewrite.trace.header, if set) and a line for
 every frame 0..N. Otherwise it is tried again (Wine sometimes ends or hangs a starting process): a try is

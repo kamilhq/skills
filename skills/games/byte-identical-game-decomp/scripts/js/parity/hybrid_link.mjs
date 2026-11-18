@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // Parity test: hybrid_link.py vs js/hybrid_link.mjs (phase 6 hybrid build: linker map, link, verify).
 //
-//   node parity/hybrid_link.mjs [--root PROJECT] [--python python3] [--cache ASM_CACHE] [--module VVVVVV]
-//                               [--keep] [--tmp DIR]
+//   node parity/hybrid_link.mjs [--root PROJECT] [--python python3] [--cache ASM_CACHE] [--binary NAME]
+//                               [--module NAME] [--obj DIR] [--keep] [--tmp DIR]
 //
-// PROJECT (default: the current directory) must hold work/game/<MODULE>.exe, reassembled/<MODULE>,
-// src_matched/<MODULE> (annotated sources), src_matched/build (compiled objects), decompiled_named_exe/index.json
-// and decompiled_exe/instructions.tsv. --cache is a reassemble.py assembler cache for reassembled/<MODULE>
+// PROJECT (default: the current directory) must have a decomp.json whose binary --binary (default: the first
+// with "matching": true) has its exe, its phase-5b text (reassembled), its annotated sources (<paths.src>/<name>),
+// their compiled objects (--obj, default <paths.build>/obj/<name>), its named decompile's index.json and its
+// decompile's instructions.tsv; --module is the annotations' module name (default the binary's name). Without
+// them the test stops with exit 2 and says what is missing. --cache is a reassemble.py assembler cache for the
+// phase-5b text
 // (copied for every run, never written); without it one Python `reassemble.py build --cache` makes it (slow).
 // Both sides run from PROJECT with the same arguments and their own TMPDIR inside the test's temp dir.
 // Cases:
@@ -15,24 +18,25 @@
 //   map --all        without --functions and --instructions (no name index, no call pairing: UNRESOLVED lines)
 //   link             the hybrid binary from the Python-written map: binary + stdout; SHA-256 = the original
 //   link             with the --all map: refused (exit 1, message)
-//   verify           IDENTICAL; and against another file (DIFFERENT; the kept temp path is normalised)
+//   verify           IDENTICAL; and against a copy with one byte changed (DIFFERENT; the kept temp path is normalised)
 //   errors           argparse usage/help texts and errors
 // Prints one JSON summary; exit 0 only when every case is identical.
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { Parity, parseOpts, SK } from '../lib/peparity.mjs'
+import { Parity, parseOpts, projectBinaries, SK } from '../lib/peparity.mjs'
 
-const opts = parseOpts(process.argv.slice(2), { root: undefined, python: undefined, cache: undefined, module: 'VVVVVV',
-                                                keep: false, tmp: undefined })
+const opts = parseOpts(process.argv.slice(2), { root: undefined, python: undefined, cache: undefined, binary: undefined,
+                                                module: undefined, obj: undefined, keep: false, tmp: undefined })
 const P = new Parity('hybrid_link', opts)
 const t = (...p) => P.tmpPath(...p)
-const M = opts.module
-const EXE = `work/game/${M}.exe`
+const BIN = projectBinaries(P.root, { script: 'hybrid_link', select: opts.binary, matching: !opts.binary })[0]
+const M = opts.module ?? BIN.name
+const EXE = BIN.exe, RE = BIN.reassembled, SRC = BIN.src, OBJ = opts.obj ?? BIN.obj
+const FUNCS = `${BIN.named}/index.json`, INSTR = `${BIN.decompiled}/instructions.tsv`
 const sha = (f) => createHash('sha256').update(readFileSync(f)).digest('hex')
-for (const p of [EXE, `reassembled/${M}`, `src_matched/${M}`, 'src_matched/build', 'decompiled_named_exe/index.json',
-                 'decompiled_exe/instructions.tsv']) {
+for (const p of [EXE, RE, SRC, OBJ, FUNCS, INSTR]) {
   if (!existsSync(P.path(p))) {
-    process.stdout.write(JSON.stringify({ script: 'hybrid_link', error: `missing ${P.path(p)} (use --root)` }) + '\n')
+    process.stdout.write(JSON.stringify({ script: 'hybrid_link', error: `missing ${P.path(p)} (use --root, --binary, --obj)` }) + '\n')
     process.exit(2)
   }
 }
@@ -42,7 +46,7 @@ const env = { py: { TMPDIR: t('tmp_py') }, js: { TMPDIR: t('tmp_js') } }
 let cache = opts.cache
 if (!cache) {
   cache = t('asm_cache.json')
-  P.run('py', ['build', `reassembled/${M}`, t('cache_build.bin'), '--cache', cache], { pyScript: `${SK}/reassemble.py` })
+  P.run('py', ['build', RE, t('cache_build.bin'), '--cache', cache], { pyScript: `${SK}/reassemble.py` })
 }
 let nc = 0
 const cacheCopy = () => { const f = t(`cache_${nc++}.json`); copyFileSync(cache, f); return f }
@@ -58,8 +62,8 @@ function both(name, pyArgs, jsArgs, { files = [], stderr = true } = {}) {
   return [a, b]
 }
 
-const MAP = ['map', '--pe', EXE, '--src', `src_matched/${M}`, '--obj', 'src_matched/build', '--module', M]
-const IDX = ['--functions', 'decompiled_named_exe/index.json', '--instructions', 'decompiled_exe/instructions.tsv']
+const MAP = ['map', '--pe', EXE, '--src', SRC, '--obj', OBJ, '--module', M]
+const IDX = ['--functions', FUNCS, '--instructions', INSTR]
 const maps = {}
 for (const [name, extra] of [['strict', IDX], ['all', [...IDX, '--all']], ['all_noindex', ['--all']]]) {
   const [a] = both(`map ${name} (${extra.join(' ') || 'no options'})`,
@@ -69,18 +73,22 @@ for (const [name, extra] of [['strict', IDX], ['all', [...IDX, '--all']], ['all_
   P.notes.push(`map ${name}: exit ${a.rc}, ${a.stdout.toString().replace(/\s+/g, ' ').trim()}`)
 }
 // link / verify from the Python-written maps
-both('link strict map', ['link', `reassembled/${M}`, maps.strict, t('hy_py.exe'), '--cache', cacheCopy()],
-  ['link', `reassembled/${M}`, maps.strict, t('hy_js.exe'), '--cache', cacheCopy()], { files: [[t('hy_py.exe'), t('hy_js.exe')]] })
+both('link strict map', ['link', RE, maps.strict, t('hy_py.exe'), '--cache', cacheCopy()],
+  ['link', RE, maps.strict, t('hy_js.exe'), '--cache', cacheCopy()], { files: [[t('hy_py.exe'), t('hy_js.exe')]] })
 for (const s of ['py', 'js']) {
   const f = t(`hy_${s}.exe`)
   P.record(`link strict map (${s}): SHA-256 equals ${EXE}`, existsSync(f) && sha(f) === sha(P.path(EXE)) ? [] : ['differs'])
 }
-both('link --all map (refused)', ['link', `reassembled/${M}`, maps.all, t('hya_py.exe'), '--cache', cacheCopy()],
-  ['link', `reassembled/${M}`, maps.all, t('hya_js.exe'), '--cache', cacheCopy()], { files: [[t('hya_py.exe'), t('hya_js.exe')]] })
-both('verify strict map (IDENTICAL)', ['verify', EXE, `reassembled/${M}`, maps.strict, '--cache', cacheCopy()],
-  ['verify', EXE, `reassembled/${M}`, maps.strict, '--cache', cacheCopy()])
-both('verify against another file (DIFFERENT)', ['verify', 'work/game/SDL2.dll', `reassembled/${M}`, maps.strict, '--cache', cacheCopy()],
-  ['verify', 'work/game/SDL2.dll', `reassembled/${M}`, maps.strict, '--cache', cacheCopy()])
+both('link --all map (refused)', ['link', RE, maps.all, t('hya_py.exe'), '--cache', cacheCopy()],
+  ['link', RE, maps.all, t('hya_js.exe'), '--cache', cacheCopy()], { files: [[t('hya_py.exe'), t('hya_js.exe')]] })
+both('verify strict map (IDENTICAL)', ['verify', EXE, RE, maps.strict, '--cache', cacheCopy()],
+  ['verify', EXE, RE, maps.strict, '--cache', cacheCopy()])
+const changed = t('changed.exe')
+const cb = Buffer.from(readFileSync(P.path(EXE)))
+cb[cb.length >> 1] ^= 0xff
+writeFileSync(changed, cb)
+both('verify against a changed copy (DIFFERENT)', ['verify', changed, RE, maps.strict, '--cache', cacheCopy()],
+  ['verify', changed, RE, maps.strict, '--cache', cacheCopy()])
 // argparse
 for (const args of [[], ['-h'], ['map', '-h'], ['link', '-h'], ['verify', '-h'], ['map'], ['link'], ['verify'], ['bogus'],
                     ['map', '--pe'], ['link', 'a', 'b', 'c', 'd'], ['verify', '--cache'], ['map', '--pe', 'x', '--src', 'y', '--obj', 'z', '--out']]) {

@@ -17,7 +17,7 @@ analysis finds (most of them vtable targets, the rest orphan code); DLLs can gai
 2. `UnreferencedRegions.java` - only in a PE with relocations: an interval of `.text` between two anchors
    (relocation site, relocation target, export/entry) holding >= 32768 bytes that are not `00/CC/90` is not
    compiled code (code reaches a global, import, string, float constant or switch table every few hundred
-   bytes; the longest relocation-free run in real code measured 7.2 KB, VVVVVV.exe). Code in it reached by a
+   bytes; the longest relocation-free run in real code measured 7.2 KB, in a VS2010 game exe). Code in it reached by a
    branch or a fall-through from outside, transitively, is kept (the last C++ EH funclet before such a region,
    `mov eax, offset FuncInfo` / `jmp ___CxxFrameHandler`, has its relocation in the `mov`, so its `jmp` lies
    in the region); the rest is cleared and defined as a byte array so no later step decodes it (`UNREFREGION`
@@ -77,7 +77,7 @@ Read the log lines `UNREFREGIONS`, `PTRTARGETS`, `ORPHANS`, `CODEGAPS`, `NONEXEC
     byte [ecx + T]`) up to the next referenced address or branch target; zero bytes after either count with it;
   - `record_table` - an array of fixed-size records at a relocation target that only data points to, whose
     pointer slot (one dword per record, fixed offset) holds a relocated pointer to non-executable data or
-    NULL in every record, >= 3 pointers, no branch into it (joan.exe: DirectInput `c_dfDIKeyboard`,
+    NULL in every record, >= 3 pointers, no branch into it (e.g. DirectInput `c_dfDIKeyboard`,
     `c_dfDIMouse`, `c_dfDIJoystick` from dinput8.lib, 16-byte `DIOBJECTDATAFORMAT` records with GUID pointers);
   - `unreferenced_region` - the `UnreferencedRegions.java` rule above, and no branch or fall-through into the
     gap (a tail-call `JMP` has flow `call` in `instructions.tsv` but does not fall through); entropy is
@@ -98,16 +98,16 @@ Read the log lines `UNREFREGIONS`, `PTRTARGETS`, `ORPHANS`, `CODEGAPS`, `NONEXEC
   invoke_watson, ExitProcess). A wrong one truncates every caller.
 
 ## Pitfalls that actually happened
-- **Data in `.text` carved into functions** (Wars and Warriors: Joan of Arc, VC6, 13 PEs): joan.exe carries a
-  1.95 MB encrypted blob (entropy 7.99, no relocation in or into it) left by a removed protection layer;
-  JoanofArc.exe and the four v3d_*.dll a ~64 KB stale linker buffer (source text, mangled names, MIDL
-  strings, floats) at the end of `.text`; ALut.dll and wmfdist.exe have `.rdata`/`.idata` merged into `.text`;
-  joan.exe has DirectInput `c_dfDI*` format tables in `.text`. Before the fixes above, gap disassembly made
-  1,184 false functions in v3d_k3d.dll (984 failed to decompile - not 3DNow!: Ghidra decodes `PFMUL`/`FEMMS`
-  fine), 202 in JoanofArc.exe, 54 in joan.exe's blob; unrelocated UTF-16 dwords made 91 one-byte `int3`
-  "functions" in joan.exe; import thunk tables (133 thunks in joan.exe) stayed unrecovered; VSetting.exe and
-  wmfdist.exe (no `.reloc`) crashed the checker.
-- **False functions from filler and switch data** (VVVVVV 2.4.4, VS2010 exe + VS2019 SDL2.dll): before the
+- **Data in `.text` carved into functions** (a VC6 game with 13 PEs): its main exe carried a 1.95 MB
+  encrypted blob (entropy 7.99, no relocation in or into it) left by a removed protection layer; a launcher
+  exe and four renderer DLLs a ~64 KB stale linker buffer (source text, mangled names, MIDL strings, floats)
+  at the end of `.text`; an audio DLL and a redistributable's setup exe had `.rdata`/`.idata` merged into
+  `.text`; the main exe had DirectInput `c_dfDI*` format tables in `.text`. Before the fixes above, gap
+  disassembly made 1,184 false functions in one renderer DLL (984 failed to decompile - not 3DNow!: Ghidra
+  decodes `PFMUL`/`FEMMS` fine), 202 in the launcher, 54 in the main exe's blob; unrelocated UTF-16 dwords
+  made 91 one-byte `int3` "functions" in the main exe; import thunk tables (133 thunks there) stayed
+  unrecovered; two exes without `.reloc` crashed the checker.
+- **False functions from filler and switch data** (a VS2010 game exe + a VS2019 `SDL2.dll`): before the
   fixes above, the pipeline passed its own gate while creating 571 false functions in SDL2.dll and 65 in
   the exe, and missing 6 real ones. Causes: MSVC loop-alignment filler inside functions (`8D 9B 00000000`,
   `8D 64 24 00`) not in the padding list, so the filler became a function running into its parent's loop;
@@ -115,7 +115,7 @@ Read the log lines `UNREFREGIONS`, `PTRTARGETS`, `ORPHANS`, `CODEGAPS`, `NONEXEC
   list built once, so code after a gap's first new function was never visited; a D3D11 shader blob in
   `.rdata` made a function by Ghidra itself. `orphan_instructions=0` cannot catch any of these; only
   the reference check above does.
-- **Jump tables decoded as code** (VVVVVV: one game switch table at 0x4537fc, 25 instructions): Ghidra
+- **Jump tables decoded as code** (e.g. one game switch table decoded as 25 instructions): Ghidra
   sometimes flows into a switch table and disassembles it inside the function body, so no coverage metric
   sees it. `code_coverage_check.py` reports them (`jump_tables_decoded_as_code`); the containing
   function's pseudocode is wrong there; phase 5b found them because relocated dwords straddled

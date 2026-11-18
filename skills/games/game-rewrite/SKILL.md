@@ -46,7 +46,7 @@ Everything game-specific lives in the project, in a `"rewrite"` section of the d
   "toolchain": {"cl_mode": "wine", "machine": "x86"},
   "exe_name": "Game.exe", "game": "build/oracle/game", "runner": "wine", "wineprefix": "~/.wine",
   "env": {"replay": "GAME_REPLAY", "trace": "GAME_TRACE", "exit_frame": "GAME_EXIT_FRAME", "fb": "GAME_TRACE_FB"},
-  "args": ["-basedir", "{basedir}\\"], "saves": "saves", "fps": 30,
+  "args": ["-savedir", "{basedir}\\"], "saves": "saves", "fps": 30,
   "trace": {"header": "GAME-TRACE 1", "frame_field": "f", "fields": ["gs", "p", "v", "fb"], "decode": {"v": "f32"}},
   "scenarios": "rewrite/harness/scenarios",
   "oracle": {"binary": "Game", "dir": "build/oracle", "files": ["rewrite/harness/hooks.h"],
@@ -82,23 +82,25 @@ made-up matched units, a tiny PE) and must report every case identical. Change b
 | `cpp/emit.py` | 4 | one-shot generator: place annotated functions by config, drop scaffolding, canonical constants, headers |
 | `cpp/gen_data.py` | 4 | C++ definitions of extern-only data, read from the exe's sections |
 | `cpp/keysend.cpp` | 4, 6 | Win32 tool: post scripted key presses to a window by title (real input) |
-| `examples/libraries_vvvvvv.json` | 1, 2 | the validated case's complete `libraries.json` |
-| `examples/cpp_config_vvvvvv.json` | 4 | the validated case's cpp config (placement, scaffolding patterns, renames, constants, data tables) |
+| `examples/libraries_example.json` | 1, 2 | a complete `libraries.json` for an SDL2 game with seven static libraries (pins, evidence, build fields, C API shims, a patched copy, a prebuilt SDK) |
+| `examples/cpp_config_example.json` | 4 | a small made-up cpp config that shows every key (placement, scaffolding patterns, renames, constants, data tables) |
 | `rust/gen_skeleton.py` | 4 | `index`: function index from matched units (address, name, C++ head, unit, class, body; globals; class members); `generate`: one Rust stub per function with its address line, `src/state/statics.rs`, `names.tsv`, never over a hand-edited file |
 | `rust/replace_fn.py` | 4 | replace functions in a `.rs` file by new versions, matched by their `// 0x<address>` line |
 | `rust/template/` | 4 | `stub.rs` (stub macro, log file, panic hook), `cnum.rs` (MSVC `rand`, `ftol`, C numerics), `cbuf.rs` (`CBuf<N>` = `char[N]`): generic, copy into the crate |
-| `examples/rust_config_vvvvvv.json` | 4 | the validated case's gen_skeleton config (modules, class roles, placement rules, cx analysis, type mapping) |
+| `examples/rust_config_example.json` | 4 | a small made-up gen_skeleton config that shows every key (modules, class roles, placement rules, cx analysis, type mapping) |
 
 ## Validated on
-VVVVVV 2.4.4 (VS2010 SP1, SDL2, seven static libraries): libraries pinned from the binary, both toolchains'
-hello programs `RESULT: OK` under Wine on macOS, an oracle with 4 edited functions and 19 scenarios (951 to
-5,001 frames: menus, play modes, time trials, the editor, own test levels, languages, fuzz) that gave
-byte-identical traces and saves in every run. Steps 1-5 are done for both languages:
-- **C++ rewrite**: 976 game functions (all 12 NONMATCHING included) plus a rewritten WinMain, 60 `.cpp` and
-  49 `.h` files, built with VS2010;
-- **Rust rewrite**: 936 functions translated from generated stubs plus 15 written by hand, 31 modules,
-  about 78,500 lines, `i686-pc-windows-gnu` with rust-lld and the libraries as DLLs, `unsafe` only in the FFI
-  layer; built by 8 parallel translation waves and one integration (`orchestration.md`);
-- **both are identical to the original in all 19 scenarios**, framebuffer hash and save files included; 39
-  of 40 extra Rust-vs-C++ fuzz replays are identical too (the 40th quits early in both).
-Step 6, the user playing the rewrite on Windows, is pending.
+End to end on a 2010s SDL2 game built with VS2010 SP1 (`/MT`, SDL2 as a DLL, seven static libraries):
+libraries pinned from the binary, both toolchains' hello programs `RESULT: OK` under Wine on macOS, an oracle
+with 4 edited main-loop functions and about twenty scenarios (1,000 to 5,000 frames each: menus, every play
+mode, the level editor, test levels the harness wrote itself, every language family, seeded fuzz) that gave
+byte-identical traces and saves in every run. Steps 1-5 were done for both languages:
+- **C++ rewrite**: about a thousand game functions (every NONMATCHING one included) plus a rewritten
+  `WinMain`, about 110 `.cpp`/`.h` files, built with the original compiler;
+- **Rust rewrite**: every function translated from generated stubs (a few written by hand in the
+  foundation), about 30 modules and 80,000 lines, `i686-pc-windows-gnu` with rust-lld and the libraries as
+  DLLs, `unsafe` only in the FFI layer; built by 8 parallel translation waves and one integration
+  (`orchestration.md`);
+- **both identical to the original in every scenario**, framebuffer hash and save files included, and
+  identical to each other in dozens of extra fuzz replays.
+Step 6, a user playing the rewrite on Windows, is not part of what was validated.

@@ -6,9 +6,9 @@
 Matched units often declare tables as `extern` and match against the original's data; a rewrite needs real
 definitions. The config (a JSON file, or the "data" section of the cpp config) lists them:
   "pe": "work/game/Game.exe",
-  "symbols": [{"base": "0x623660", "stride": 5, "count": 55, "expr": "glyph[{i}]"}],
-  "items": [{"name": "areamusic", "va": "0x51bfb0", "type": "int32", "count": 400, "per_line": 20,
-             "width": 2, "decl": "static const int areamusic[20 * 20]", "file": "music/Music.cpp"}, ...]
+  "symbols": [{"base": "0x4a2000", "stride": 5, "count": 55, "expr": "glyph[{i}]"}],
+  "items": [{"name": "level_music", "va": "0x4b1000", "type": "int32", "count": 400, "per_line": 20,
+             "width": 2, "decl": "static const int level_music[20 * 20]", "file": "music/Music.cpp"}, ...]
 Item keys: "name", "va" (virtual address with the image base), "type", "count" (elements) or "dims"
 ([rows, columns, ...]: nested braces, one innermost row per line), "per_line" (default 16, strings 1),
 "width" (right-justify numbers), "format" ("dec", "hex" or "hexN": 0x%0NX), "decl" (the text before

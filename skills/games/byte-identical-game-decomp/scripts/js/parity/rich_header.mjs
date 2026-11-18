@@ -3,14 +3,15 @@
 //
 //   node parity/rich_header.mjs [--root PROJECT] [--python python3] [--keep]
 //
-// Cases: every PE found under work/, build/, reassembled/relink/ (the game exe/dll, rebuilt and relinked
+// Cases: every PE found under PROJECT's work/, build/, reassembled/relink/ (the game exe/dll, rebuilt and relinked
 // binaries, the installer's redistributables) decoded one per invocation and all together; --compare for every
 // ordered pair of distinct files among them (capped) and a file with itself; synthetic files (truncated PE,
 // MZ without PE signature, a PE whose Rich header is stripped, a Rich header with an unknown product id);
-// errors: missing file, a text file, bad arguments. Compares exit code, stdout and stderr.
+// errors: missing file, a text file, bad arguments. Compares exit code, stdout and stderr. The synthetic files are
+// made from the first binary of PROJECT/decomp.json (else the first PE found); exit 2 when PROJECT has no PE.
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { Parity, parseOpts } from '../lib/peparity.mjs'
+import { fail, Parity, parseOpts, projectBinaries } from '../lib/peparity.mjs'
 
 const opts = parseOpts(process.argv.slice(2), { root: undefined, python: undefined, keep: false })
 const P = new Parity('rich_header', opts)
@@ -28,7 +29,11 @@ for (const d of ['work', 'build', join('reassembled', 'relink')]) walk(P.path(d)
 pes.sort()
 
 // synthetic inputs
-const game = P.path('work', 'game', 'VVVVVV.exe')
+const bins = projectBinaries(P.root, { script: 'rich_header', required: false }).filter((b) => existsSync(b.abs.exe))
+const game = bins.length ? bins[0].abs.exe : pes[0]
+if (!game) fail('rich_header', `no PE file under ${P.path('work')}, ${P.path('build')} or ${P.path('reassembled', 'relink')}: run it from a decomp project (or pass --root PROJECT)`)
+const textFile = P.tmpPath('readme.txt')
+writeFileSync(textFile, 'a text file, not a PE\n')
 const syn = []
 if (existsSync(game)) {
   const d = readFileSync(game)
@@ -63,7 +68,7 @@ for (const a of pes) {
 }
 for (const s of syn) both(`--compare game ${s}`, ['--compare', game, s])
 for (const [name, args] of [
-  ['missing file', [P.tmpPath('nope.exe')]], ['text file', [P.path('work', 'game', 'readme.txt')]],
+  ['missing file', [P.tmpPath('nope.exe')]], ['text file', [textFile]],
   ['missing + good', [P.tmpPath('nope.exe'), game]], ['--compare missing', ['--compare', game, P.tmpPath('nope.exe')]],
   ['no arguments', []], ['-h', ['-h']], ['--help', ['--help']], ['--compare one file', ['--compare', game]],
   ['--compare three files', ['--compare', game, game, game]], ['directory', [P.path('work')]],

@@ -17,8 +17,8 @@ compiler (+ Wine on macOS/Linux), Python stdlib, Ghidra - nothing else.
   in large counts may be the CRT's, not the game's. Compare with the DLLs built by the same team (they
   show the developers' own compiler build when they link fewer libraries).
 - The user must supply the matching compiler: Visual C++ 6.0 + service pack (+ Processor Pack if `/arch` or
-  SSE appear) for the era this skill targets, or whatever MSVC the Rich header names (VVVVVV 2.4.4: VS2010
-  SP1). On macOS/Linux install it under Wine; set `VC6_ROOT` (or the equivalent), `PATH`, `INCLUDE`, `LIB`
+  SSE appear) for the era this skill targets, or whatever MSVC the Rich header names (e.g. VS2010 SP1 for a
+  2010s game). On macOS/Linux install it under Wine; set `VC6_ROOT` (or the equivalent), `PATH`, `INCLUDE`, `LIB`
   for `cl.exe`/`link.exe`. Wine and the compiler are the only things phase 6 adds to Python + Ghidra.
 
 ## 1b. Installing the compiler under Wine (macOS/Linux)
@@ -56,9 +56,9 @@ sh scripts/msvc.sh --version      # must print 16.00.40219.01 / Linker 10.00.402
 (env MSVC_PREFIX / MSVC_VS / MSVC_SDK for other versions) and filters Wine noise. Pass relative file names
 (cl reads a leading `/` as an option). Then confirm the build with a test program: compile one `.c` and one
 `.cpp` file, link, and compare `rich_header.py` entries (product id + build) with the target's. Tested on
-Apple Silicon (Wine 11, Rosetta): the VVVVVV test program's entries (147/30729, 158, 170, 171, 157 at 40219)
-matched VVVVVV.exe, and the first real function (binaryBlob's constructor, `/O2 /MT /EHsc /GS /Oy- /Gy`)
-compiled IDENTICAL.
+Apple Silicon (Wine 11, Rosetta): a test program's entries (147/30729, 158, 170, 171, 157 at 40219)
+matched a VS2010 SP1 game exe's, and the first real function (a small class constructor, `/O2 /MT /EHsc /GS
+/Oy- /Gy`) compiled IDENTICAL.
 
 ## 2. Discover compiler flags
 Compile small candidate functions and compare codegen with the original:
@@ -70,9 +70,9 @@ Compile small candidate functions and compare codegen with the original:
 - struct packing `/Zp`, `/QIfist`, `/Op` (float consistency changes x87 code).
 Record the flag set per object if it varies (DLLs may differ from the exe).
 
-## 2b. Lessons from the first matched project (VVVVVV 2.4.4, VS2010 SP1)
+## 2b. Lessons from a matched project (a 2010s SDL2 game, VS2010 SP1)
 - **Flags are per source file.** One global flag set is a hypothesis, not a fact: compile every candidate
-  with the variants (e.g. with and without `/EHsc`) and compare. VVVVVV: no function in the first 88 units
+  with the variants (e.g. with and without `/EHsc`) and compare. In that project no function in the first 88 units
   needed `/EHsc`, 10 only matched without it (EH changes `std::string[N]` array init/teardown into `eh vector
   constructor iterator` calls and adds FS:[0] frames). Keep a per-file flags line in each unit
   (`// CLFLAGS: ...`, read by the project's match script) and split a unit file when its functions need
@@ -81,7 +81,7 @@ Record the flag set per object if it varies (DLLs may differ from the exe).
   conventions (arguments in EAX/ESI/EDI, no prologue), cross-file inlining, and different register
   allocation. A per-file compile cannot reproduce these; detect them early (registers read before written
   at entry, stack args at shifted offsets), record them, and leave those functions in assembly (phase 5b
-  keeps the binary identical). VVVVVV: 3 of 147 functions in the first units.
+  keeps the binary identical). There: 3 of 147 functions in the first units.
 - **Compiler-generated functions** (dynamic initializers `??__E<var>@@YAXXZ`, atexit destructors
   `??__F<var>@@YAXXZ`) have no source name: annotate with the explicit decorated symbol and define only the
   global with its class's ctor/dtor declared out of line.
@@ -91,8 +91,8 @@ Record the flag set per object if it varies (DLLs may differ from the exe).
   <crtdefs.h>)` before the STL includes fixes it without changing code generation.
 - **Agent loop that worked**: one agent per 1-4 small translation units, a shared notes file of idioms and
   blockers updated after every wave, a compile-and-compare command per unit that can also score stubs, and
-  an independent re-run of every unit (`match_all`) for the numbers. Final result for VVVVVV.exe: 1,202 of
-  1,215 compile targets identical (98.9%) in 6 waves plus a clean-up pass (smallest units first, 4 -> 2 -> 1
+  an independent re-run of every unit (`match_all`) for the numbers. Final result for that exe: 98.9% of
+  about 1,200 compile targets identical in 6 waves plus a clean-up pass (smallest units first, 4 -> 2 -> 1
   units per agent as functions grow; notes consolidated by an agent between waves).
 - **Most "LTCG blockers" are not**: a per-file `/O2` compile gives file-static functions the same custom
   register conventions. Reproduce them with an unannotated `static __declspec(noinline)` stand-in with the
@@ -154,7 +154,7 @@ phase-5b dir, the objects and that map:
 3. regenerate `.reloc` from the objects' DIR32 relocations plus the sites still in assembly;
 4. compare SHA-256.
 
-VVVVVV: 1,202 functions (510 KB, 57% of `.text`) gave an IDENTICAL exe. A one-byte change in one object
+In that project about 1,200 functions (510 KB, 57% of `.text`) gave an IDENTICAL exe. A one-byte change in one object
 moves the first difference to exactly that byte.
 
 - **Within-object conflicts:** the map step reports a symbol that one object places at two addresses (an
@@ -167,7 +167,7 @@ moves the first difference to exactly that byte.
 The step after the hybrid build: the real linker builds the exe from COFF objects, so link order, imports,
 exports, resources and `.reloc` are link.exe's own work. Do the shared headers first: one definition per
 class (offsets checked against the exe's relocations), every unit migrated and re-verified. Each global then
-resolves to one address. VVVVVV went from 144 conflicting relocation sites to 1 (a real duplicate constant).
+resolves to one address. One project went from 144 conflicting relocation sites to 1 (a real duplicate constant).
 
 `relink.py prepare | link | finish` (docstring has the details):
 - **Code:** every matched function is a COMDAT holding the compiler's bytes and relocations. Everything
@@ -178,7 +178,7 @@ resolves to one address. VVVVVV went from 144 conflicting relocation sites to 1 
   alignment so it lands at the same RVA. The load config is the `__load_config_used` symbol. The IAT and
   import tables are left out for link to build.
 - **Imports** are built by link.exe from import libraries:
-  - Prefer the SDK's libraries; VVVVVV's 117 system imports had exactly the SDK 7.1 hints.
+  - Prefer the SDK's libraries; a VS2010 exe's 117 system imports had exactly the SDK 7.1 hints.
   - Generate the rest with `lib /DEF`. Write `name @hint DATA`: DATA avoids jump thunks. `@hint` alone
     makes an import by ordinal, so patch each short import member to name type NAME_NOPREFIX; the hint
     stays.
@@ -200,7 +200,7 @@ resolves to one address. VVVVVV went from 144 conflicting relocation sites to 1 
   COMDAT with the missing count (measured once) reproduces SizeOfImage and the file size.
 - **Post-link facts** (`finish`), each counted: Rich header (from @comp.id records the relink inputs do not
   have; the PE header moves with e_lfanew), TimeDateStamp, IAT slot order, the UpdateResource bytes, then
-  the recomputed checksum. VVVVVV: 730 of 2,321,408 bytes, final exe SHA-256-identical.
+  the recomputed checksum. For a 2.3 MB exe: 730 bytes, final exe SHA-256-identical.
 - **Not covered:** data defined in C++. Literals, constants, globals and vtables stay raw sections; the
   compiled objects' own data is not linked. That is the next phase, as large as function matching.
 
@@ -220,22 +220,22 @@ build, so make the free mode work and test it with an edit you can see:
   - Two things are refused: pointers into its old interior, and short jumps of the remaining assembly that
     span it.
   - New code is linked after the original code, new data after the original data. Linking new `.rdata`
-    ahead of the original data stopped VVVVVV from starting.
+    ahead of the original data stopped the game from starting.
 - **RVA tables have no base relocations,** so they must go to link.exe as DIR32NB relocations or they go
   stale when code moves: the SafeSEH handler table (read its count from the load-config struct, whose own
   Size can exceed the directory entry's) and the export table (directory pointers, function and name
   RVAs).
 - **Verify a moved build with a differential check** (`relink.py check`). Use `/MAP` (always written) to map every original
   `_A_<va>` to its new address. Then check that each direct branch of the original and each `.reloc`
-  pointer lands on its moved target. VVVVVV: 48,097 branches and 3,181 pointers, 0 mismatches. One
+  pointer lands on its moved target. Example: about 48,000 branches and 3,200 pointers, 0 mismatches. One
   corrupted call is caught.
 - **Edited functions also need names nothing annotates.** Use the named function index (library functions,
   `FID_conflict:` CRT names). Resolve unchanged literals and floating-point constants to the original's
   bytes. Pair the rest in order with the original function: calls such as `__chkstk`, and the unit's statics
   through its relocated pointers, so a file-level static stays the variable other code uses.
 - **Near-matches in the build.** Tag a FUNCTION that is right but not byte-identical with `// NONMATCHING`:
-  the source build uses it, the identical build keeps the assembly. VVVVVV's 12 register tie-breaks run
-  this way.
+  the source build uses it, the identical build keeps the assembly. A dozen register tie-breaks ran this
+  way in one project.
 - **Run it.** Under Wine on macOS, CoreGraphics' window list (via ctypes, no screen-recording permission)
   gives the window title, so an edited title proves the edit is in the running game. Retry the launch:
   Wine sometimes ends a starting process silently, the original exe included.

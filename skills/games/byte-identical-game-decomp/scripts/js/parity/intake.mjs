@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Parity test: intake.py vs js/intake.mjs.
 //
-//   node parity/intake.mjs [--installer setup_x.exe] [--game work/game] [--manifest manifests/<name>.json]
+//   node parity/intake.mjs [--installer setup_x.exe] [--game work/game] [--manifest manifests/game.json]
 //                          [--python python3] [--keep]
 //
 // Cases (Python and JS run the same command; exit code, stdout, stderr and written files must match):
@@ -23,7 +23,12 @@ import { Harness, argOpt, normTiming, ROOT, SK, JS } from './intake_harness.mjs'
 const h = new Harness('intake')
 const installer = argOpt(h.argv, '--installer')
 const game = path.resolve(ROOT, argOpt(h.argv, '--game', 'work/game'))
-const refManifest = path.resolve(ROOT, argOpt(h.argv, '--manifest', 'manifests/vvvvvv_2.4.4_90346.json'))
+const refManifest = path.resolve(ROOT, argOpt(h.argv, '--manifest', 'manifests/game.json'))
+if (!fs.existsSync(game) || !fs.statSync(game).isDirectory()) {
+  process.stdout.write(JSON.stringify({ script: 'intake', error: `${game} is not a folder: pass --game <the installed or ` +
+    'extracted game folder> (and --installer setup_x.exe, --manifest <its committed manifest>); nothing game-specific is built into the test' }) + '\n')
+  process.exit(2)
+}
 const PY = path.join(SK, 'intake.py'), JSI = path.join(JS, 'intake.mjs')
 const tmp = h.tmp('run')
 
@@ -66,7 +71,8 @@ function extractCase(name, setup, extra = []) {
   return [pd, jd]
 }
 both('extract:missing installer', ['extract', path.join(tmp, 'nope.exe'), path.join(tmp, 'o')])
-if (fs.existsSync(path.join(game, 'SDL2.dll'))) extractCase('extract:not inno', path.join(game, 'SDL2.dll'))
+const notInno = fs.readdirSync(game).sort().find((f) => /\.(dll|exe)$/i.test(f) && !/^unins/i.test(f))
+if (notInno) extractCase('extract:not inno', path.join(game, notInno))
 let pyTree = null, jsTree = null
 if (installer) {
   ;[pyTree, jsTree] = extractCase('extract:default', installer)

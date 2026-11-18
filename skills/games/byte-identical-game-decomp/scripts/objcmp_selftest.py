@@ -421,26 +421,26 @@ def main():
     lines = ['// objcmp selftest sources', '']
     for f in funcs:
         if f['name'] == '?Update@CUnit@@QAEXXZ':
-            lines += [f'// FUNCTION: VVVVVV 0x{f["va"]:x}', 'void CUnit::Update()', '{', '}', '']
+            lines += [f'// FUNCTION: GAME 0x{f["va"]:x}', 'void CUnit::Update()', '{', '}', '']
         elif f['name'].startswith('?Foo'):
             continue
         elif f is funcs[4]:
-            lines += [f'// FUNCTION: VVVVVV 0x{f["va"]:x} {f["name"]}', 'static int helper_with_other_name(int a) {',
+            lines += [f'// FUNCTION: GAME 0x{f["va"]:x} {f["name"]}', 'static int helper_with_other_name(int a) {',
                       '}', '']
         elif f is funcs[5]:
             lines += [f'// FUNCTION: 0x{f["va"]:x}', f'int __stdcall {f["name"][1:]}(int a, int b) {{ return 0; }}', '']
         else:
-            lines += [f'// FUNCTION: VVVVVV 0x{f["va"]:x}', f'int {f["name"][1:]}(void)', '{', '    return 0;', '}', '']
+            lines += [f'// FUNCTION: GAME 0x{f["va"]:x}', f'int {f["name"][1:]}(void)', '{', '    return 0;', '}', '']
     gsym = next(r['symbol'] for f in funcs if f['name'].startswith('_fn_') for r in f['relocations']
                 if r['symbol'].startswith('_g_') and int(r['symbol'][3:], 16) == gmap[r['symbol']])
-    lines += [f'// GLOBAL: VVVVVV 0x{gmap[gsym]:x}', f'extern int {gsym[1:]};', '',
-              '// GLOBAL: VVVVVV 0x4a0000', 'int g_counter = 0;', '',
-              '// VTABLE: VVVVVV 0x4b0000', 'class CUnit : public CBase {', '};', '',
+    lines += [f'// GLOBAL: GAME 0x{gmap[gsym]:x}', f'extern int {gsym[1:]};', '',
+              '// GLOBAL: GAME 0x4a0000', 'int g_counter = 0;', '',
+              '// VTABLE: GAME 0x4b0000', 'class CUnit : public CBase {', '};', '',
               '// FUNCTION: OTHERMOD 0x401234', 'void other_module_function() {}', '']
     with open(os.path.join(src, 'game.cpp'), 'w') as fh:
         fh.write('\n'.join(lines))
     jout = os.path.join(work, 'report.json')
-    rc, out = cli('report', '--pe', args.pe, '--src', src, '--obj', objs['gy'], '--module', 'VVVVVV',
+    rc, out = cli('report', '--pe', args.pe, '--src', src, '--obj', objs['gy'], '--module', 'GAME',
                   '--json', jout, '-q', *fopt)
     rep = json.load(open(jout))
     sm = rep['summary']
@@ -453,10 +453,10 @@ def main():
           len(rep['data']) == 3 and any(d['symbol'] == gsym for d in rep['data'])
           and sum(f.get('relocs_checked') or 0 for f in rep['functions']) >= 1 and all(f['module'] != 'OTHERMOD' for f in rep['functions']))
     with open(os.path.join(src, 'bad.cpp'), 'w') as fh:
-        fh.write(f'// FUNCTION: VVVVVV 0x{funcs[2]["va"]:x}\nvoid Foo(int x) {{\n}}\n\n'
-                 f'// FUNCTION: VVVVVV 0x{funcs[3]["va"]:x}\nvoid Missing::Thing() {{\n}}\n\n'
-                 f'// STUB: VVVVVV 0x{funcs[3]["va"] + 0x1000:x}\nvoid fn_00000000() {{\n}}\n')
-    rc, out = cli('report', '--pe', args.pe, '--src', src, '--obj', objs['gy'], '--module', 'VVVVVV',
+        fh.write(f'// FUNCTION: GAME 0x{funcs[2]["va"]:x}\nvoid Foo(int x) {{\n}}\n\n'
+                 f'// FUNCTION: GAME 0x{funcs[3]["va"]:x}\nvoid Missing::Thing() {{\n}}\n\n'
+                 f'// STUB: GAME 0x{funcs[3]["va"] + 0x1000:x}\nvoid fn_00000000() {{\n}}\n')
+    rc, out = cli('report', '--pe', args.pe, '--src', src, '--obj', objs['gy'], '--module', 'GAME',
                   '--json', jout, '-q', *fopt)
     rep = json.load(open(jout))
     st = {f['va']: f['status'] for f in rep['functions']}

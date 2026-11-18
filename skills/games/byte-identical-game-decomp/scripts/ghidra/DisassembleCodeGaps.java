@@ -110,7 +110,7 @@ public class DisassembleCodeGaps extends GhidraScript {
     // Why freshly decoded code cannot be compiled code, or null. Every flow (branch target or fall-through) of
     // real code lands on an instruction start inside the image: a flow outside the image, into a
     // non-executable block, onto bytes that do not decode, or into the middle of another instruction proves
-    // the bytes are data (DirectInput c_dfDIKeyboard records in joan.exe decode as "call 0x017b16f0").
+    // the bytes are data (DirectInput c_dfDIKeyboard records in a VC6 exe decode as "call 0x017b16f0").
     String implausible(AddressSetView set) {
         InstructionIterator ii = l.getInstructions(set, true);
         while (ii.hasNext()) {

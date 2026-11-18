@@ -5,7 +5,7 @@
 // every absolute address the program uses - a call through the IAT, a global, a string literal, a float
 // constant, a switch table, a vtable or callback entry - is a relocation site, and every pointer to code is a
 // relocation target. Compiled code goes at most a few KB without one (largest relocation-free run measured in
-// real code: 7.2 KB of non-filler bytes, VVVVVV.exe). A region is an interval of an executable block between
+// real code: 7.2 KB of non-filler bytes, in a VS2010 game exe). A region is an interval of an executable block between
 // two such anchors (relocation site, relocation target, exported/entry address) with >= MIN_NONFILL bytes that
 // are not 00/CC/90. Inside it, code is kept when it is reached: every instruction reached by flow (branch or
 // fall-through) from an instruction outside the region, transitively, and the whole body of a function that

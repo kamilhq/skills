@@ -19,7 +19,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
-import { Parity, parseOpts, SK } from '../lib/peparity.mjs'
+import { Parity, parseOpts, projectBinaries, SK } from '../lib/peparity.mjs'
 import { dumps, parse } from '../lib/pyjson.mjs'
 
 const opts = parseOpts(process.argv.slice(2), { root: undefined, python: undefined, keep: false })
@@ -51,18 +51,20 @@ function variant(src, name, edit) {
   return d
 }
 
-const pairs = [['decompiled_exe', 'VVVVVV.exe'], ['decompiled_named_exe', 'VVVVVV.exe'],
-               ['decompiled_sdl2', 'SDL2.dll'], ['decompiled_named_sdl2', 'SDL2.dll']]
-  .filter(([d, b]) => existsSync(P.path(d, 'index.json')) && existsSync(P.path('work', 'game', b)))
+// the decompile dirs of every binary of PROJECT/decomp.json (exit 2 without one): [dir, binary, named?]
+const bins = projectBinaries(P.root, { script: 'build_features' })
+const exeOf = new Map(bins.map((b) => [b.file, b.abs.exe]))
+const pairs = bins.flatMap((b) => [[b.decompiled, b.file, false], [b.named, b.file, true]])
+  .filter(([d, b]) => existsSync(P.path(d, 'index.json')) && existsSync(exeOf.get(b)))
 for (const [dd, bin] of pairs) {
-  const exe = P.path('work', 'game', bin)
+  const exe = exeOf.get(bin)
   both(`${dd} index mode`, [P.path(dd), exe, '@A@'])
   const pseudo = variant(P.path(dd), `${dd}_pseudo`, (fs) => { for (const f of fs) f.delete('callees') })
   both(`${dd} pseudocode mode`, [pseudo, exe, '@A@'])
 }
 if (pairs.length) {
-  const [dd, bin] = pairs.find(([d]) => d === 'decompiled_named_exe') ?? pairs[0]
-  const exe = P.path('work', 'game', bin)
+  const [dd, bin] = pairs.find(([, , named]) => named) ?? pairs[0]
+  const exe = exeOf.get(bin)
   const syn = variant(P.path(dd), 'callee_forms', (fs) => {
     fs.forEach((f, i) => {
       const cs = f.get('callees') ?? []
@@ -86,13 +88,15 @@ if (pairs.length) {
   both('rerun over stale chunks', [P.path(dd), exe, '@A@'], { pre: [[P.path(dd), exe, '@A@', '--chunk-lines', '1000']] })
   const other = pairs.find(([, b]) => b !== bin)
   if (other) {
-    const oexe = P.path('work', 'game', other[1])
+    const oexe = exeOf.get(other[1])
     both('dir of another binary (exit 2)', [P.path(other[0]), oexe, '@A@'], { pre: [[P.path(dd), exe, '@A@']] })
     both('dir of another binary --force', [P.path(other[0]), oexe, '@A@', '--force'], { pre: [[P.path(dd), exe, '@A@']] })
     both('decompile of another binary (exit 2)', [P.path(other[0]), exe, '@A@'])
   }
   both('features.json without meta (note)', [P.path(dd), exe, '@A@'], { prepare: (d) => { mkdirSync(d); writeFileSync(join(d, 'features.json'), '[]') } })
-  both('not a PE (exit 1)', [P.path(dd), P.path('work', 'game', 'readme.txt'), '@A@'])
+  const textFile = P.tmpPath('readme.txt')
+  writeFileSync(textFile, 'a text file, not a PE\n')
+  both('not a PE (exit 1)', [P.path(dd), textFile, '@A@'])
   both('two arguments', [P.path(dd), exe])
   both('four arguments', [P.path(dd), exe, '@A@', 'extra'])
   both('--chunk-lines without value', [P.path(dd), exe, '@A@', '--chunk-lines'])
@@ -107,7 +111,7 @@ if (pairs.length) {
                    { address: '0x401000' }, { addr: '0x10', name: 'n' }, { name: 'only' }, { address: null, name: 'nm' }, { address: 'bad', name: '' },
                    { address: 'EXTERNAL:1' }, [1, 2]]
   const files = []
-  for (const dd of ['decompiled_named_exe', 'decompiled_named_sdl2', 'decompiled_exe']) {
+  for (const dd of [...new Set([...pairs.filter(([, , named]) => named), ...pairs.filter(([, , named]) => !named)].map(([d]) => d))]) {
     const fd = P.path(dd, 'functions')
     if (!existsSync(fd)) continue
     for (const f of readdirSync(fd).sort().filter((x, i) => x.endsWith('.c') && i % 40 === 0)) files.push(join(fd, f))

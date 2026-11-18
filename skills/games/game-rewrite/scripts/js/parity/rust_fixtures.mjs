@@ -20,7 +20,7 @@ export const RUST_INDEX = {
     fn('0x4011c0', 'Ent::~Ent', 'Ent::~Ent()', '012_401100_ent', { class: 'Ent' }),
     fn('0x401200', 'Rect::Rect', 'Rect::Rect()', '013_401200_util', { class: 'Rect' }),
     fn('0x401240', 'Rect::area', 'int Rect::area() const', '013_401200_util', { class: 'Rect', body: '{ return w * h; }' }),
-    fn('0x401280', 'Tower::scroll', 'void Tower::scroll(int by)', '014_401280_world', { class: 'Tower', body: '{ pos += by; }' }),
+    fn('0x401280', 'Camera::scroll', 'void Camera::scroll(int by)', '014_401280_world', { class: 'Camera', body: '{ pos += by; }' }),
     fn('0x4012c0', 'text::print', 'void text::print(int x, int y, const std::string& s, unsigned char r = 255)', '015_4012c0_text', { class: null, namespace: 'text', body: '{ font_draw(x, y); }' }),
     fn('0x401300', 'text::measure', 'int text::measure(const char* s, int* out_w, int* out_h)', '015_4012c0_text', { class: null, namespace: 'text', body: '{ if (out_h) *out_h = 8; return 0; }' }),
     fn('0x401340', 'FS_readFile', 'bool FS_readFile(const char* path, unsigned char** mem, size_t* len)', '016_401340_file', { body: '{ return g_fsInited; }' }),
@@ -29,8 +29,8 @@ export const RUST_INDEX = {
     fn('0x401400', 'font_draw', 'void font_draw(int x, int y)', '015_4012c0_text', { body: '{ world.count++; }' }),
     fn('0x401440', 'tick', 'static void tick(void)', '010_401000_world', { body: '{ font_draw(0, 0); }' }),
     fn('0x401480', 'pure_math', 'int __cdecl pure_math(int a, int b)', '017_401480_math', { body: '{ return a * b + rand(); }' }),
-    fn('0x4014c0', 'vlog_info', 'void vlog_info(const char* fmt, ...)', '018_4014c0_log', { body: '{ }' }),
-    fn('0x401500', 'ui_button_textbox_translate', 'void ui_button_textbox_translate(Ent* e)', '019_401500_ui', { body: '{ e->kind = 1; }' }),
+    fn('0x4014c0', 'log_info', 'void log_info(const char* fmt, ...)', '018_4014c0_log', { body: '{ }' }),
+    fn('0x401500', 'ui_button_label_translate', 'void ui_button_label_translate(Ent* e)', '019_401500_ui', { body: '{ e->kind = 1; }' }),
     fn('0x401540', 'make_mode', 'Mode make_mode(Mode m, int (*cb)(int), Mode** out)', '019_401500_ui', { body: '{ return m; }' }),
     fn('0x401580', 'std::vector<int>::push_back', 'void std::vector<int>::push_back(const int& v)', '020_401580_crt', { class: 'std::vector<int>' }),
     fn('0x4015c0', 'dynamic_initializer_for_world', null, '010_401000_world', { code: 'variable' }),
@@ -66,7 +66,7 @@ export const RUST_INDEX = {
     { address: '0x50042c', name: 'g_div0', type: 'char', dims: ['8 / 0'], init: '', unit: '021_401680_misc', namespace: null, static: false },
     { address: '0x500430', name: 'g_vec', type: 'std::vector<std::map<int, std::string> >', dims: [], init: '', unit: '021_401680_misc', namespace: null, static: false }
   ],
-  classes: { World: ['count', 'tower'], Ent: ['kind', 'x', 'y', 'vx'], Tower: ['pos'] }
+  classes: { World: ['count', 'camera'], Ent: ['kind', 'x', 'y', 'vx'], Camera: ['pos'] }
 }
 
 export const RUST_CONFIG = {
@@ -81,15 +81,15 @@ export const RUST_CONFIG = {
   rename: { '0x401740': 'renamed_two' },
   classes: {
     World: { rust: 'World', module: 'world', role: 'singleton', files: [['_render$', 'render'], ['.', 'world']] },
-    Tower: { rust: 'Tower', module: 'world', role: 'subobject', prefix: 'tower_', file: 'tower' },
+    Camera: { rust: 'Camera', module: 'world', role: 'subobject', prefix: 'camera_', file: 'camera' },
     Ent: { rust: 'Ent', module: 'entity', role: 'element', file: 'ent' },
     Rect: { module: 'util' },
     Renderer: { rust: 'Renderer' }
   },
   namespaces: { text: 'text' },
   names: { font_draw: 'text/font' },
-  name_patterns: [['_textbox_translate$', 'ui/textboxes']],
-  prefixes: [['FS_', 'filesystem', true], ['vlog_', 'log', false]],
+  name_patterns: [['_label_translate$', 'ui/labels']],
+  prefixes: [['FS_', 'filesystem', true], ['log_', 'log', false]],
   addresses: { '0x401780': 'misc/moved' },
   units: [['_math$', 'maths'], ['_misc$', 'misc'], ['_ui$', 'ui']],
   module_files: { misc: [['^021_', 'misc_a'], ['.', 'misc']] },
@@ -130,7 +130,7 @@ export function rustProject (W, opts = {}) {
     const m = JSON.parse(fs.readFileSync(man, 'utf8'))
     delete m.files['src/log.rs']
     w(man, JSON.stringify(m, null, 1) + '\n')
-    w(path.join(W, 'crate', 'src', 'log.rs'), '// written by hand, not in the manifest\n// 0x4014c0\npub fn vlog_info() {}\n')
+    w(path.join(W, 'crate', 'src', 'log.rs'), '// written by hand, not in the manifest\n// 0x4014c0\npub fn log_info() {}\n')
     fs.rmSync(path.join(W, 'crate', 'src', 'filesystem.rs'))
     if (opts.removeOne) w(path.join(W, 'crate', 'src', 'ui', 'mod.rs'), '')
   }

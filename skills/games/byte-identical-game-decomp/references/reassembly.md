@@ -1,7 +1,7 @@
 # Phase 5b - rebuild each binary byte-identically from assembly
 
-Status: built and verified on VVVVVV 2.4.4 (VVVVVV.exe and SDL2.dll both rebuild SHA-256-identical from
-text, and pass the editability check). Tools: Python (stdlib) + Ghidra only:
+Status: built and verified on a VS2010 game (its exe and a VS2019 `SDL2.dll` both rebuild SHA-256-identical
+from text, and pass the editability check) and on the 13 PEs of a Visual C++ 6.0 game. Tools: Python (stdlib) + Ghidra only:
 `scripts/reassemble.py` (split / build / verify / editcheck), `scripts/ghidra/AssembleLines.java` +
 `scripts/ghidra/assemble.sh` (Ghidra's assembler in a throw-away project holding a 16-byte dummy program).
 
@@ -14,7 +14,7 @@ Levels 0/1 below are implemented in a reduced form: headers and non-code section
 (`raw/`), with every pointer into `.text` replaced by a label fixup and `.reloc` regenerated from label
 references; imports/resources/exports are not decoded to JSON yet.
 
-## What was learned building it (VVVVVV.exe 278,710 instructions, SDL2.dll 309,403)
+## What was learned building it (an exe of about 280,000 instructions and a DLL of about 310,000)
 - Ghidra re-assembles its own instruction text for every instruction (0 failures). Encoding choice: Ghidra
   returns all encodings; a fixed rule (fewest prefixes, shortest, MSVC's reg,r/m direction 8B/03/2B/3B...,
   REP before REPNE, then bytes) picks the original for 99.8%. The rest carry `{enc:N}` (exe 473, dll 613).
@@ -26,7 +26,7 @@ references; imports/resources/exports are not decoded to JSON yet.
 - Non-branch x86-32 encodings do not depend on the address, so assembled bytes are cached by text; labels
   are sized with a provisional 32-bit value first (lengths never depend on an absolute label's value).
 - Jump tables Ghidra decoded as instructions (runs of >= 2 relocated code pointers overlapping instructions;
-  VVVVVV: one switch table in a game function) are emitted as `dd` data: 25 instructions in the exe. A table
+  e.g. one switch table in a game function) are emitted as `dd` data: 25 instructions in that exe. A table
   whose unused entry 0 overlaps the previous, genuine instruction (CRT `memcpy`: `JMP [EAX*4 + table]` with
   the table base inside the preceding JMP) is referenced as `L_next-0x4` (label minus offset), so it still
   moves; do not turn that instruction into data.

@@ -5,9 +5,10 @@
 //
 // Cases: random integer / string / tuple sequences (lengths 0..600, small alphabets so there are many
 // duplicates; b of 200+ items exercises the autojunk "popular" heuristic), mixed int/float/bool equality,
-// isjunk sets, sub-range find_longest_match calls, and real data from the project (byte windows of
-// work/game/VVVVVV.exe at function starts from decompiled_named_exe/index.json, lines and characters of
-// src_matched/VVVVVV/*.cpp). For every case and both autojunk settings: get_matching_blocks, get_opcodes,
+// isjunk sets, sub-range find_longest_match calls, and, when PROJECT has a decomp.json, real data from its first
+// matching binary (else its first binary): byte windows of the exe at function starts from its named
+// index.json, lines and characters of its matched sources (<paths.src>/<name>/*.cpp). Without a project only the
+// synthetic cases run. For every case and both autojunk settings: get_matching_blocks, get_opcodes,
 // get_grouped_opcodes, ratio, quick_ratio, real_quick_ratio, bjunk/bpopular counts.
 // Prints one JSON summary; exit 0 only when every case is identical.
 import { spawnSync } from 'node:child_process'
@@ -15,6 +16,7 @@ import { readFileSync, writeFileSync, mkdtempSync, rmSync, existsSync, readdirSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SequenceMatcher } from '../lib/difflib.mjs'
+import { projectBinaries } from '../lib/peparity.mjs'
 import { dumps, parse, pyFloat, pyFloatRepr } from '../lib/pyjson.mjs'
 
 const argv = process.argv.slice(2)
@@ -91,7 +93,9 @@ add('string junk', 'private Thread currentThread;'.split(''), 'private volatile 
   { junk: [' '] })
 
 // real data
-const exe = join(ROOT, 'work/game/VVVVVV.exe'), idx = join(ROOT, 'decompiled_named_exe/index.json')
+const bins = projectBinaries(ROOT, { script: 'difflib', required: false })
+const bin = bins.find((b) => b.matching) ?? bins[0]
+const exe = bin ? bin.abs.exe : '', idx = bin ? join(bin.abs.named, 'index.json') : ''
 let real = 0
 if (existsSync(exe) && existsSync(idx)) {
   const d = readFileSync(exe)
@@ -119,8 +123,8 @@ if (existsSync(exe) && existsSync(idx)) {
     real++
   }
 }
-const srcDir = join(ROOT, 'src_matched/VVVVVV')
-if (existsSync(srcDir)) {
+const srcDir = bin ? bin.abs.src : ''
+if (srcDir && existsSync(srcDir)) {
   const files = readdirSync(srcDir).filter((f) => f.endsWith('.cpp')).sort()
   for (let k = 0; k < 30 && files.length; k++) {
     const f1 = files[ri(files.length)], f2 = files[ri(files.length)]

@@ -1,6 +1,6 @@
 /* lodepng_alloc.c - the three allocator hooks lodepng calls when it is built with
- * LODEPNG_NO_COMPILE_ALLOCATORS. A game that builds lodepng this way defines them itself (the VVVVVV case
- * forwards them to SDL_malloc/SDL_realloc/SDL_free); this file is the stand-in for a DLL build.
+ * LODEPNG_NO_COMPILE_ALLOCATORS. A game that builds lodepng this way defines them itself (an SDL game
+ * typically forwards them to SDL_malloc/SDL_realloc/SDL_free); this file is the stand-in for a DLL build.
  *
  * Linked into lodepng.dll (build_libs.py, flavour "dll") so the DLL is self-contained and exports them:
  * buffers that lodepng returns (lodepng_decode32 etc.) come from the DLL's own static CRT heap, so callers

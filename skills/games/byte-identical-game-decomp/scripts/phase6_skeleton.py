@@ -9,7 +9,7 @@ own function exceeds --gap or the subsystem changes. Library and CRT functions (
 not listed: they are linked from the real libraries in the hybrid build. Each function becomes
 
     // STUB: NAME 0x401000 <decorated symbol unknown until compiled>
-    // binaryBlob::unPackBinary  (method, file, high) - evidence ...
+    // Archive::unpack  (method, file, high) - evidence ...
     // TODO: write C++; pseudocode: <decompiled>/functions/0x401000.c
 
 STUB annotations never fail `objcmp.py report`; change STUB to FUNCTION once the function is written.

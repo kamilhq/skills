@@ -22,6 +22,6 @@ Each module has a JavaScript port with the same name in `scripts/js/formats/` (`
 same rebuilt bytes; `js/parity/formats.mjs` checks them); a project that runs `js/pipeline.mjs` keeps its
 `.mjs` copies in `tools/js/formats/` (references/pipeline.md).
 
-These were first written for VVVVVV 2.4.4 (351 files identical); behaviour is unchanged from there, only
-the docstrings and `fmt_text.EXTS` were made generic. Known limits: the 7-Zip port covers the multi-pass
+These were first written for one game's data (about 350 files identical) and then made generic (docstrings
+and `fmt_text.EXTS`); behaviour is unchanged from there. Known limits: the 7-Zip port covers the multi-pass
 optimal-parsing mode only; PNG re-encoding is tied to the zlib build the decode ran with.

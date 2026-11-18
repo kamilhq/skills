@@ -4,7 +4,7 @@
 // are SEH funclets or jump-table cases).
 // In a PE with relocations only dwords at relocation sites count: a real pointer is always relocated, while
 // text is not - UTF-16 strings ("M\0C\0" = 0x0043004D) and other data look like addresses inside a large
-// .text (joan.exe: 91 one-byte "functions" on int3 filler). Without relocations every dword counts, but a
+// .text (one VC6 exe: 91 one-byte "functions" on int3 filler). Without relocations every dword counts, but a
 // target on an int3 (CC) filler byte is never a function start.
 //@category ByteIdenticalDecomp
 import ghidra.app.script.GhidraScript;

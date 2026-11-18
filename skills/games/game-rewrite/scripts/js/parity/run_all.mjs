@@ -62,7 +62,7 @@ const ENV = {
 // ------------------------------------------------------------------------------------- project setups
 const REWRITE = {
   exe_name: 'GAME.exe', env: { replay: 'GAME_REPLAY', trace: 'GAME_TRACE', exit_frame: 'GAME_EXIT_FRAME', fb: 'GAME_TRACE_FB' },
-  args: ['-basedir', '{basedir}\\'], saves: 'saves', fps: 30,
+  args: ['-savedir', '{basedir}\\'], saves: 'saves', fps: 30,
   trace: { header: 'TEST-TRACE 1', frame_field: 'f', fields: ['gs', 'p', 'v', 'flags', 'tb', 'fb'], decode: { v: 'f32' } },
   scenarios: 'harness/scenarios', oracle: { exe: 'bin/game.exe', traces: 'harness/oracle' }, libraries: 'libraries.json'
 }
@@ -80,8 +80,8 @@ function gameProject (rwOver = {}) {
 function seededProject () {
   gameProject()
   w(path.join(W, 'harness', 'levels', 'test_a.lvl'), 'level a\n')
-  w(path.join(W, 'harness', 'seed_unlock.sav'), 'unlocked=1\n')
-  w(path.join(W, 'harness', 'scenarios', '03_seeded.txt'), '#! exit_frame=4\n#! seed=levels/test_a.lvl:../levels/test_a.lvl\n#! seed=saves/unlock.sav:../seed_unlock.sav\n#! arg=-playing\n#! arg=test_a\nTEST-REPLAY 1\n0 right\n')
+  w(path.join(W, 'harness', 'seed_progress.sav'), 'level=2\n')
+  w(path.join(W, 'harness', 'scenarios', '03_seeded.txt'), '#! exit_frame=4\n#! seed=levels/test_a.lvl:../levels/test_a.lvl\n#! seed=saves/progress.sav:../seed_progress.sav\n#! arg=-level\n#! arg=test_a\nTEST-REPLAY 1\n0 right\n')
   w(path.join(W, 'harness', 'scenarios', '04_bad_seed.txt'), '#! exit_frame=4\n#! seed=levels/x.lvl:../levels/missing.lvl\nTEST-REPLAY 1\n0 -\n')
 }
 const LIBS = {

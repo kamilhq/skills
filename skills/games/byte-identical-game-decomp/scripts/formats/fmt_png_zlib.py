@@ -17,7 +17,7 @@ import fmt_png_deflate
 STRATEGY_NAMES = {0: 'default', 1: 'filtered', 2: 'huffman_only', 3: 'rle', 4: 'fixed'}
 STRATEGY_IDS = {v: k for k, v in STRATEGY_NAMES.items()}
 
-# Non-zlib match finder seen in one game's sprite sheets (VVVVVV 2.4.4, two lang/ja images):
+# Non-zlib match finder seen in one game's sprite sheets (two images of one localisation):
 # greedy parsing (lazy matching off), hash chain cut at 5 probes, position 0 usable as a match
 # source, last 2 input bytes never matched, zlib's TOO_FAR rule, zlib hash and trees.c Huffman coding.
 GREEDY5_PROFILE = dict(engine='py_deflate', variant='greedy_chain5',

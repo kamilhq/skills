@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 // Parity test: js/objcmp.mjs against objcmp.py on the project's real inputs.
 //
-//   node parity/objcmp.mjs [--root PROJECT] [--python python3] [--jobs N] [--quick]
+//   node parity/objcmp.mjs [--root PROJECT] [--python python3] [--jobs N] [--quick] [--binary NAME]
+//                          [--module NAME] [--obj DIR]
 //
-// PROJECT (default: the current directory) must hold work/game/VVVVVV.exe, decompiled_named_exe/index.json,
-// src_matched/VVVVVV/*.cpp and src_matched/build/<unit>.obj. Both implementations run from PROJECT with the
-// same arguments; stdout, stderr, exit code and every JSON file written are compared byte for byte.
+// PROJECT (default: the current directory) must have a decomp.json whose binary --binary (default: the first
+// with "matching": true) has its exe, its named decompile (index.json), its matched sources (<paths.src>/<name>/
+// *.cpp) and their compiled objects (--obj, default <paths.build>/obj/<name>/<unit>.obj); --module is the
+// annotations' module name (default the binary's name). Without them the test stops with exit 2 and says what
+// is missing. Both implementations run from PROJECT with the same arguments; stdout, stderr, exit code and every
+// JSON file written are compared byte for byte.
 // Cases:
-//   - report on every unit exactly as tools/match.sh runs it (absolute --src, -v, --functions)
+//   - report on every unit as a project match script runs it (absolute --src, -v, --functions)
 //   - report on every unit with relative paths, -q and --json FILE
 //   - report on the whole source directory and the whole build directory at once (-v, --json), and from
 //     another working directory (paths printed absolute)
@@ -24,6 +28,7 @@ import { tmpdir, availableParallelism } from 'node:os'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { load as loadJson } from '../lib/pyjson.mjs'
+import { projectBinaries } from '../lib/peparity.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SK = resolve(HERE, '..', '..')
@@ -35,11 +40,12 @@ const PY = opt('--python', 'python3')
 const JOBS = Number(opt('--jobs', String(Math.max(2, Math.min(12, availableParallelism())))))
 const QUICK = argv.includes('--quick')
 
-const EXE = 'work/game/VVVVVV.exe', FUNCS = 'decompiled_named_exe/index.json'
-const SRC = 'src_matched/VVVVVV', BUILD = 'src_matched/build'
+const BIN = projectBinaries(ROOT, { script: 'objcmp', select: opt('--binary'), matching: !opt('--binary') })[0]
+const EXE = BIN.exe, FUNCS = join(BIN.named, 'index.json')
+const SRC = BIN.src, BUILD = opt('--obj', BIN.obj), MODULE = opt('--module', BIN.name)
 for (const p of [EXE, FUNCS, SRC, BUILD]) {
   if (!existsSync(join(ROOT, p))) {
-    process.stdout.write(JSON.stringify({ script: 'objcmp', error: `missing ${join(ROOT, p)} (use --root)` }) + '\n')
+    process.stdout.write(JSON.stringify({ script: 'objcmp', error: `missing ${join(ROOT, p)} (use --root, --binary, --obj)` }) + '\n')
     process.exit(2)
   }
 }
@@ -115,15 +121,15 @@ const units = readdirSync(join(ROOT, SRC)).filter((f) => f.endsWith('.cpp')).map
   .filter((u) => existsSync(join(ROOT, BUILD, `${u}.obj`)))
 const unitList = QUICK ? units.filter((_, i) => i % 20 === 0) : units
 
-// ---- 1. report per unit, as tools/match.sh runs it, and with relative paths + --json
+// ---- 1. report per unit, as a project match script runs it, and with relative paths + --json
 for (const u of unitList) {
-  addCase(`report ${u} (match.sh)`, ['report', '--pe', EXE, '--src', join(ROOT, SRC, `${u}.cpp`), '--obj', `${BUILD}/${u}.obj`,
-                                     '--module', 'VVVVVV', '--functions', FUNCS, '-v'])
+  addCase(`report ${u} (match script)`, ['report', '--pe', EXE, '--src', join(ROOT, SRC, `${u}.cpp`), '--obj', `${BUILD}/${u}.obj`,
+                                     '--module', MODULE, '--functions', FUNCS, '-v'])
   addCase(`report ${u} -q --json`, ['report', '--pe', EXE, '--src', `${SRC}/${u}.cpp`, '--obj', `${BUILD}/${u}.obj`,
-                                    '--module', 'VVVVVV', '--functions', FUNCS, '-q', '--json', '{OUT}'], { out: 'json' })
+                                    '--module', MODULE, '--functions', FUNCS, '-q', '--json', '{OUT}'], { out: 'json' })
 }
 // ---- 2. whole directories, other cwd, JSON on stdout
-addCase('report whole src dir + whole build dir -v --json', ['report', '--pe', EXE, '--src', SRC, '--obj', BUILD, '--module', 'VVVVVV',
+addCase('report whole src dir + whole build dir -v --json', ['report', '--pe', EXE, '--src', SRC, '--obj', BUILD, '--module', MODULE,
                                                              '--functions', FUNCS, '-v', '--json', '{OUT}'], { out: 'json' })
 addCase('report all units (file list) + build dir, no --module', ['report', '--pe', EXE, '--src', ...unitList.slice(0, 40).map((u) => `${SRC}/${u}.cpp`),
                                                                   '--obj', BUILD, '--functions', FUNCS])
@@ -158,7 +164,7 @@ writeFileSync(join(TMP, 'weirdfuncs.json'), JSON.stringify({ functions: [{ addre
   { size: 3 }, { address: 4198400, size: 7.9 }, { address: '0x401010', size: '0x10' }, { address: null }, { address: true, size: false }] }))
 const someUnits = unitList.filter((_, i) => i % 9 === 0)
 for (const u of someUnits) {
-  const base = ['report', '--pe', EXE, '--src', `${SRC}/${u}.cpp`, '--obj', `${BUILD}/${u}.obj`, '--module', 'VVVVVV']
+  const base = ['report', '--pe', EXE, '--src', `${SRC}/${u}.cpp`, '--obj', `${BUILD}/${u}.obj`, '--module', MODULE]
   addCase(`report ${u} --map text`, [...base, '--map', join(TMP, 'map.txt'), '-v'])
   addCase(`report ${u} --map dict + list json, --no-auto-names`, [...base, '--map', join(TMP, 'map.json'), '--map', join(TMP, 'maplist.json'),
                                                                    '--no-auto-names', '-v', '--json', '{OUT}'], { out: 'json' })

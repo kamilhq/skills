@@ -57,7 +57,7 @@ replay = host(os.environ['GAME_REPLAY'])
 trace = host(os.environ['GAME_TRACE'])
 exit_frame = int(os.environ['GAME_EXIT_FRAME'])
 fb = os.environ.get('GAME_TRACE_FB', '1') != '0'
-basedir = host(args[args.index('-basedir') + 1]).rstrip('/') if '-basedir' in args else None
+basedir = host(args[args.index('-savedir') + 1]).rstrip('/') if '-savedir' in args else None
 seen = []
 if basedir and os.path.isdir(basedir):
     for root, dirs, files in os.walk(basedir):
@@ -66,7 +66,7 @@ if basedir and os.path.isdir(basedir):
             with open(fp) as sf:
                 seen.append(os.path.relpath(fp, basedir).replace(os.sep, '/') + ' ' + sf.read().strip())
     seen.sort()
-plain_args = [x for i, x in enumerate(args) if not (i > 0 and args[i - 1] == '-basedir')]
+plain_args = [x for i, x in enumerate(args) if not (i > 0 and args[i - 1] == '-savedir')]
 events = []
 header = False
 for line in open(replay):
@@ -98,7 +98,7 @@ if basedir:
     os.makedirs(os.path.join(basedir, 'saves'), exist_ok=True)
     with open(os.path.join(basedir, 'saves', 'settings.sav'), 'w') as f:
         f.write('x=%d\n' % x)
-    with open(os.path.join(basedir, 'saves', 'unlock.sav'), 'w') as f:
+    with open(os.path.join(basedir, 'saves', 'progress.sav'), 'w') as f:
         f.write('frames=%d\n' % (exit_frame + 1))
     with open(os.path.join(basedir, 'log.txt'), 'w') as f:
         f.write('basedir file, not a save\n')

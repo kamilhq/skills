@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Parity test: js/objcmp_selftest.mjs against objcmp_selftest.py.
 //
-//   node parity/objcmp_selftest.mjs [--root PROJECT] [--python python3]
+//   node parity/objcmp_selftest.mjs [--root PROJECT] [--python python3] [--binary NAME]
 //
-// Runs both self-tests on PROJECT/work/game/VVVVVV.exe with the same arguments, each with its own --work
+// Runs both self-tests on a binary of PROJECT/decomp.json (--binary, default the first; its decompile and named
+// decompile give the --functions lists; exit 2 without a decomp.json) with the same arguments, each with its own --work
 // directory (the Python one drives objcmp.py, the JS one objcmp.mjs). Compared: exit code, stdout and stderr
 // (with the work directory path replaced by <WORK>), and every file left in the work directories (objects
 // written by write_obj, address map, functions.json, generated sources, report.json) byte for byte, text files
@@ -15,6 +16,7 @@ import { readFileSync, mkdtempSync, rmSync, existsSync, readdirSync, statSync } 
 import { tmpdir } from 'node:os'
 import { join, dirname, resolve, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { projectBinaries } from '../lib/peparity.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const SK = resolve(HERE, '..', '..')
@@ -23,7 +25,8 @@ const argv = process.argv.slice(2)
 const opt = (name, def) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : def }
 const ROOT = resolve(opt('--root', process.cwd()))
 const PY = opt('--python', 'python3')
-const EXE = 'work/game/VVVVVV.exe'
+const BIN = projectBinaries(ROOT, { script: 'objcmp_selftest', select: opt('--binary') })[0]
+const EXE = BIN.exe
 if (!existsSync(join(ROOT, EXE))) {
   process.stdout.write(JSON.stringify({ script: 'objcmp_selftest', error: `missing ${join(ROOT, EXE)} (use --root)` }) + '\n')
   process.exit(2)
@@ -54,10 +57,10 @@ const listFiles = (d) => {
 const norm = (buf, work) => Buffer.from(buf.toString('latin1').replaceAll(work, '<WORK>'), 'latin1')
 
 const configs = [
-  ['index.json (decompiled_exe)', ['--functions', 'decompiled_exe/index.json']],
-  ['index.json (decompiled_named_exe) --count 30', ['--functions', 'decompiled_named_exe/index.json', '--count', '30']],
-  ['--count 8', ['--functions', 'decompiled_exe/index.json', '--count', '8']],
-  ['--count 45', ['--functions', 'decompiled_exe/index.json', '--count', '45']],
+  ['index.json (decompile)', ['--functions', join(BIN.decompiled, 'index.json')]],
+  ['index.json (named decompile) --count 30', ['--functions', join(BIN.named, 'index.json'), '--count', '30']],
+  ['--count 8', ['--functions', join(BIN.decompiled, 'index.json'), '--count', '8']],
+  ['--count 45', ['--functions', join(BIN.decompiled, 'index.json'), '--count', '45']],
   ['heuristic function finder', []],
   ['heuristic --count 12', ['--count', '12']],
 ]

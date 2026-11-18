@@ -10,7 +10,7 @@
 //   equal to original_hex instead: id <TAB> index_or_-1 <TAB> ncandidates.
 // Encoding rule (sort key, ascending): number of prefix bytes; length; for ALU/MOV reg,reg forms the
 // r/m,reg direction (opcode bit 1 clear: 01 09 11 19 21 29 31 39 89 ...) after the reg,r/m one (MSVC emits
-// 03 0B 13 1B 23 2B 33 3B 8B); REP (F3) before REPNE (F2); then the bytes. On VVVVVV.exe this picks the
+// 03 0B 13 1B 23 2B 33 3B 8B); REP (F3) before REPNE (F2); then the bytes. On a VS2010 game exe this picks the
 // original encoding for 99.8% of instructions; the rest carry an explicit enc index or become db bytes.
 // The assembler runs in a fresh, empty program with the target's language: it never sees original bytes.
 // x86-32 encodings do not depend on the instruction address except relative branches, which the caller

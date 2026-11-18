@@ -3,7 +3,8 @@
 //
 //   node parity/peek.mjs [--root PROJECT] [--python python3] [--labels N] [--keep]
 //
-// Cases (per binary work/game/VVVVVV.exe and SDL2.dll): one invocation per address group, compared line by
+// Cases (per binary of PROJECT/decomp.json, with its named decompile; exit 2 without one): one invocation per
+// address group, compared line by
 // line: Ghidra labels taken from the decompiled pseudocode (s_..., u_..., DAT_..., PTR_..., up to --labels per
 // binary; these hit the cp1252 string, UTF-16 and raw-byte branches), every section start/end/last byte, the
 // uninitialised tail of sections whose virtual size exceeds their raw size, headers, addresses below the image
@@ -15,7 +16,7 @@
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { Parity, parseOpts } from '../lib/peparity.mjs'
+import { Parity, parseOpts, projectBinaries } from '../lib/peparity.mjs'
 import { sections } from '../peek.mjs'
 import { isPrintable } from '../lib/pytools.mjs'
 
@@ -47,12 +48,13 @@ function cmpLines(name, a, b) {
   P.compare(`${name} (exit code, whole stdout, stderr)`, a, b, { stderr: true })
 }
 
-for (const [bin, dd] of [['VVVVVV.exe', 'decompiled_named_exe'], ['SDL2.dll', 'decompiled_named_sdl2']]) {
-  const exe = P.path('work', 'game', bin)
+const bins = projectBinaries(P.root, { script: 'peek' })
+for (const { file: bin, abs } of bins) {
+  const exe = abs.exe, dd = abs.named
   if (!existsSync(exe)) { P.notes.push(`${exe} missing: skipped`); continue }
   const d = readFileSync(exe)
   const [base, hdrs, secs] = sections(d)
-  const lab = labelsFrom(P.path(dd))
+  const lab = labelsFrom(dd)
   const addrs = []
   const hx = (v) => '0x' + v.toString(16)
   addrs.push(hx(base), hx(base + 0x3c), (base + 0x40).toString(16), hx(base + hdrs - 1), hx(base + hdrs), '0x10', '0', hx(base - 1))
@@ -74,14 +76,16 @@ for (const [bin, dd] of [['VVVVVV.exe', 'decompiled_named_exe'], ['SDL2.dll', 'd
   }
 }
 // error paths
-const exe = P.path('work', 'game', 'VVVVVV.exe')
+const exe = bins[0].abs.exe
+const textFile = P.tmpPath('readme.txt')
+writeFileSync(textFile, 'a text file, not a PE\n')
 const trunc = P.tmpPath('truncated.exe')
 if (existsSync(exe)) writeFileSync(trunc, readFileSync(exe).subarray(0, 0x150))
 const notpe = P.tmpPath('notpe.bin')
 writeFileSync(notpe, Buffer.from('MZ' + '\0'.repeat(0x3a) + '\x40\0\0\0' + 'XXXX', 'latin1'))
 for (const [name, args] of [
   ['no arguments', []], ['one argument', [exe]], ['missing file', [P.tmpPath('nope.exe'), '0x401000']],
-  ['text file', [P.path('work', 'game', 'readme.txt'), '0x401000']], ['no PE signature', [notpe, '0x401000']],
+  ['text file', [textFile, '0x401000']], ['no PE signature', [notpe, '0x401000']],
   ['truncated PE', [trunc, '0x401000', '0x400000', '0x400010']], ['bad addresses', [exe, 'zz', '0x401000', '123456789', 'DAT_1234']],
   ['label forms', [exe, 'FUN_00401000', 'LAB_00401010', 'x_y_00401000', '00401000', '0X401000']],
 ]) {

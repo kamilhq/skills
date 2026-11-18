@@ -28,26 +28,26 @@ exits 0 only when its gate holds.
 ## decomp.json
 ```json
 {
-  "game": "VVVVVV 2.4.4",
+  "game": "Game 1.0",
   "paths": {"game": "work/game", "extracted": "extracted", "decoded": "decoded", "reports": "reports",
             "formats": "tools/formats", "analysis": "analysis", "src": "src_matched", "build": "build"},
-  "archives": ["data.zip", "goggame-1207659753.hashdb"],
+  "archives": ["assets.zip", "goggame-1234567890.hashdb"],
   "formats": [
     {"module": "text",   "trees": ["game"]},
     {"module": "png",    "trees": ["game", "extracted"]},
     {"module": "wav",    "trees": ["extracted"]},
     {"module": "zip",    "trees": ["game"]}
   ],
-  "containers": ["data.zip", "goggame-1207659753.hashdb", "vvvvvvmusic.vvv"],
+  "containers": ["assets.zip", "goggame-1234567890.hashdb", "music.pak"],
   "binaries": [
-    {"name": "VVVVVV", "file": "VVVVVV.exe", "decompiled": "decompiled_exe",
-     "named": "decompiled_named_exe", "reassembled": "reassembled/VVVVVV", "matching": true},
+    {"name": "Game", "file": "Game.exe", "decompiled": "decompiled_exe",
+     "named": "decompiled_named_exe", "reassembled": "reassembled/Game", "matching": true},
     {"name": "SDL2", "file": "SDL2.dll", "decompiled": "decompiled_sdl2",
      "named": "decompiled_named_sdl2", "reassembled": "reassembled/SDL2", "matching": false}
   ],
   "toolchain": {"compiler": "msvc", "version": "16.00.40219.01", "flags": "/O2 /MT /GS /Oy- /Gy",
                 "wineprefix": "~/.wine-vs2010", "sdk_lib": "Program Files (x86)/Microsoft SDKs/Windows/v7.1/Lib"},
-  "run": {"wineprefix": "~/.wine", "exe": "VVVVVV.exe"}
+  "run": {"wineprefix": "~/.wine", "exe": "Game.exe"}
 }
 ```
 - `paths` are relative to the project (absolute paths work too); any can be omitted (these are the
@@ -117,5 +117,5 @@ on a project, command by command, and compares their output and every file they 
 ## Validated on
 | Game | Files | Data decoders | Binaries | Identical build | Notes |
 |---|---|---|---|---|---|
-| VVVVVV 2.4.4 (VS2010 SP1) | 283 | 7 modules, 351 files | 2 (exe matched in C++: 1,203 functions) | 283/283, also `--no-original` | source build runs, edits verified in game |
-| Wars and Warriors: Joan of Arc 1.0 (VC6) | 9,569 | 27 modules, 9,556 files | 13 (phase-5b text) | 9,569/9,569, also `--no-original` | new game, first run of the generic flow: intake (GOG `{app}` files), 7 decoder groups in parallel, Ghidra + reassembly per binary; C++ matching waits for the user's Visual C++ 6.0 |
+| a 2010s SDL2 game (VS2010 SP1) | about 300 | 7 modules, about 350 files | 2 (exe matched in C++: about 1,200 functions) | every file, also `--no-original` | source build runs, edits verified in game |
+| a 2000s Direct3D game (Visual C++ 6.0) | about 9,500 | 27 modules, about 9,500 files | 13 (phase-5b text) | every file, also `--no-original` | first run of the generic flow on a new game: intake (GOG `{app}` files), 7 decoder groups in parallel, Ghidra + reassembly per binary; C++ matching needs the user's Visual C++ 6.0 |

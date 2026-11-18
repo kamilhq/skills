@@ -12,10 +12,11 @@ A game binary holds four kinds of code. A rewrite treats them differently, so cl
 Gate: every function of the exe (and of every DLL the game ships) is in exactly one class, with the evidence
 for that class. Nothing stays "unknown".
 
-The VVVVVV 2.4.4 case (VS2010 SP1, `/MT`): 3,253 functions in `VVVVVV.exe` after full recovery. The naming
-pass tags gave about 1,160 CRT and compiler support, about 860 library functions in seven libraries
-(PhysFS 269, tinyxml2 151, lodepng 147, FAudio 147, stb_vorbis 76, SheenBidi 60, c-hashmap 9), and about
-1,240 game functions. The game ships `SDL2.dll` as a separate DLL, so SDL2 is a library by construction.
+Typical proportions, from one SDL2 game built with VS2010 SP1 (`/MT`, about 3,300 functions in the exe after
+full recovery): about a third CRT and compiler support, about a quarter library code in seven statically
+linked libraries (PhysFS, tinyxml2, lodepng, FAudio, stb_vorbis, SheenBidi, c-hashmap; from about 270
+functions down to 9 each), and the rest, about 1,200, game code. A game that ships `SDL2.dll` as a separate
+DLL has SDL2 as a library by construction.
 
 ## Inputs from the decomp skill
 - The phase-4 function set, complete (`code_coverage_check.py` clean). An incomplete set hides library
@@ -40,8 +41,8 @@ Work from the strongest evidence down.
    and the CRT usually sits together near the end of `.text`. A run that starts with one known library
    function usually holds the rest of that library.
 5. **Function sets.** Compare the names the binary has (from its strings, exports, call graph) with the
-   functions of the candidate library. Missing modules tell which build options were used: VVVVVV has
-   FAudio's core but no FACT, F3DAudio, FAPOFX or XNA_Song code, so only five source files were built.
+   functions of the candidate library. Missing modules tell which build options were used: an exe with
+   FAudio's core but no FACT, F3DAudio, FAPOFX or XNA_Song code was built from five FAudio source files only.
 6. **Constants and layouts.** CRC and Huffman tables, magic numbers, struct sizes passed to `malloc`,
    pool item sizes. They identify a library and often narrow its version.
 7. **Call graph.** A function called only from library code, and calling only library or CRT code, is
@@ -53,15 +54,15 @@ exact CRT does not need pinning: the rewrite uses its own compiler's runtime. Co
 pinning either.
 
 ### Borderline cases
-- **Library code compiled inside a game unit.** VVVVVV compiles FAudio's copy of `stb_vorbis.h` inside its
-  own music unit: the stb_vorbis functions are interleaved with `SoundTrack::` and `MusicTrack::` methods
-  (one address range), and `FILE` is mapped to `SDL_RWops`. Classify those functions as the library, and
-  note that the game configured it (I/O and allocator mapping). The rewrite reproduces the configuration,
-  not the code.
+- **Library code compiled inside a game unit.** A game may compile a single-header library (here FAudio's
+  copy of `stb_vorbis.h`) inside its own audio unit: the library's functions are then interleaved with the
+  game's `Music::` methods (one address range), and `FILE` may be mapped to `SDL_RWops`. Classify those
+  functions as the library, and note that the game configured it (I/O and allocator mapping). The rewrite
+  reproduces the configuration, not the code.
 - **Hooks the game supplies to a library.** lodepng built with `LODEPNG_NO_COMPILE_ALLOCATORS` calls
-  `lodepng_malloc/realloc/free`, which VVVVVV defines itself (forwarding to `SDL_malloc`). Those three are
-  game code; the rewrite defines them too.
-- **STL instances.** `std::vector<entclass>::push_back` is runtime code with a game type. It is not
+  `lodepng_malloc/realloc/free`, which the game then defines itself (for example forwarding to
+  `SDL_malloc`). Those three are game code; the rewrite defines them too.
+- **STL instances.** `std::vector<Entity>::push_back` is runtime code with a game type. It is not
   rewritten: the rewrite's own STL provides it. Keep the type.
 - **Modified libraries.** A studio's patched copy of zlib or Lua is a library with a patch. Record the patch
   (the diff against upstream that the binary shows) and apply it to the pinned upstream source.
@@ -71,7 +72,7 @@ The rewrite must call the same library code the original called, or behaviour dr
 explains (rounding, parsing corner cases, memory layout). Pin each library to one release or commit, with
 evidence, before building anything.
 
-| Evidence | Example from VVVVVV |
+| Evidence | Example (an SDL2 game's libraries) |
 |---|---|
 | A version function or constant | `PHYSFS_getLinkedVersion` stores 3, 2, 0; `FAudioLinkedVersion` returns 240200 (24.02.00) |
 | A version string, then the repository history | lodepng's `"20220717"`: exactly one commit sets that `LODEPNG_VERSION_STRING` (18964554, the day after) |
@@ -93,11 +94,12 @@ How to narrow it down:
    compare `sizeof` and offsets with the binary when layouts matter.
 
 ### Patched copies: test the pin, do not trust it
-A library the game got from another library may be a patched copy. VVVVVV's stb_vorbis is not upstream:
-it is FAudio 24.02's `src/stb_vorbis.h`, which is stb_vorbis v1.20 plus FAudio's patches (an `fread`-based
-`get8`, a zero-size `setup_malloc` fix, export macros). The exe's `get8` reads with `fread(&c, 1, 1, f)`,
-which is FAudio's change. Plain upstream v1.20 failed with `VORBIS_outofmem` (3) on all 16 tracks of the
-game's music file (Ogg streams without comments hit the zero-size allocation); FAudio's copy opened all 16.
+A library the game got from another library may be a patched copy. An stb_vorbis inside an FAudio game is
+often not upstream: FAudio 24.02's `src/stb_vorbis.h` is stb_vorbis v1.20 plus FAudio's patches (an
+`fread`-based `get8`, a zero-size `setup_malloc` fix, export macros). An exe whose `get8` reads with
+`fread(&c, 1, 1, f)` has FAudio's copy. In one game, plain upstream v1.20 failed with `VORBIS_outofmem` (3) on
+every track of the game's music file (Ogg streams without comments hit the zero-size allocation); FAudio's
+copy opened them all.
 Lesson: after pinning, run the library on the game's own data in the step-2 hello program. A pin is done
 when the game's files load, not when the version string matches.
 
@@ -110,9 +112,9 @@ Decide per library:
 | statically linked | static `.lib`, same flags as the original where known (`/MT`, `/GS`) | one DLL per library with its own static CRT (`toolchains.md` explains why) |
 | statically, with its API exported from the exe | static, export macro kept (the exe keeps exporting it, as the original did) | DLL, exported |
 
-Prefer the game's own copy of a shipped DLL at run time. VVVVVV's `SDL2.dll` (2.30.0) is a different
-build from the official 2.30.0 release's DLL; the rewrite runs with the game's file and takes only
-headers and the import library from the release.
+Prefer the game's own copy of a shipped DLL at run time. A game's `SDL2.dll` can be a different build from
+the official release's DLL of the same version (seen with 2.30.0); the rewrite runs with the game's file and
+takes only headers and the import library from the release.
 
 ## Recording the result
 Write `rewrite/INVENTORY.md` (game-derived numbers stay in the project) and the machine-readable
@@ -123,14 +125,13 @@ Function table: one row per address range or unit, not per function, with a coun
 | Range | Functions | Class | Library / unit | Evidence |
 |---|---|---|---|---|
 | `<start>-<end>` | n | game | units 001-180 | matched units (phase 6) |
-| 0x465930-0x46ded0 | n | game + library | music unit with stb_vorbis compiled inside | interleaved; `stb_vorbis_*` exported |
-| 0x49b610 + 2 | 3 | game | lodepng allocator hooks | forward to `SDL_malloc` / `SDL_realloc` / `SDL_free` |
-| `<start>-<end>` | 269 | library | PhysFS 3.2.0 | `PHYSFS_getLinkedVersion` (0x49d650) |
+| `<start>-<end>` | n | game + library | music unit with stb_vorbis compiled inside | interleaved; `stb_vorbis_*` exported |
+| `<addr>` + 2 | 3 | game | lodepng allocator hooks | forward to `SDL_malloc` / `SDL_realloc` / `SDL_free` |
+| `<start>-<end>` | n | library | PhysFS 3.2.0 | `PHYSFS_getLinkedVersion` (`<addr>`) |
 | ... | | | | |
 | `<start>-<end>` | n | CRT / compiler | VS2010 LIBCMT | Rich header, `FID_conflict:` names |
 
-(Addresses shown are the VVVVVV ones quoted elsewhere in this file; take the full table from the project's
-own analysis.)
+(Take the full table from the project's own analysis.)
 
 Library table: one row per library.
 
@@ -140,7 +141,8 @@ Library table: one row per library.
 | stb_vorbis | 1.20 + FAudio patches | FAudio 24.02 | FAudio's `src/stb_vorbis.h` | no pushdata API, no integer conversion | static / DLL | NULL-data behaviour, `fread` in `get8`; plain 1.20 cannot open the game's music |
 
 Each library row becomes one entry of `libraries.json` (`version`, `commit`, `url`, `sha256`, `evidence`,
-and the build fields). `scripts/examples/libraries_vvvvvv.json` is the complete file of the validated case.
+and the build fields). `scripts/examples/libraries_example.json` is a complete file for an SDL2 game with
+seven static libraries.
 
 ## Checklist
 - [ ] Function set complete (decomp phase 4 gate) and every function classified.

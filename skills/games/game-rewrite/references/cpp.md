@@ -5,11 +5,12 @@ global and function, that builds with the step-2 toolchain against the step-1 li
 step-3 scenarios. Gate: **it builds, every function annotation of the decomp is accounted for, and every
 scenario is identical to the oracle (traces with the framebuffer hash, and the save files)**.
 
-The validated case: VVVVVV 2.4.4. Input: 273 matched units (`src_matched/VVVVVV`, 1,215 `// FUNCTION` and 69
-`// STUB` annotations, 12 `// NONMATCHING`). Result: 976 game functions brought over (all 12 NONMATCHING
-included) plus a rewritten WinMain, in 60 `.cpp` and 49 `.h` files (76,619 + 3,989 lines; 1.7 MB of the 3.9 MB
-are map and tower tables). It builds with VS2010 SP1 in about 20 s from clean, and all 3 scenarios (1,101 to 1,601
-frames) are identical to the oracle in every field, framebuffer hash included, with byte-identical saves.
+Scale of a validated run (an SDL2 game built with VS2010 SP1): about 270 matched units (about 1,200
+`// FUNCTION` and 70 `// STUB` annotations, a dozen `// NONMATCHING`) became about a thousand game functions
+(every NONMATCHING one included) plus a rewritten WinMain, in about 60 `.cpp` and 50 `.h` files (about
+80,000 lines, nearly half of the bytes level and map tables). It built with the original compiler in about
+20 s from clean, and every scenario was identical to the oracle in every field, framebuffer hash included,
+with byte-identical saves.
 
 ## 1. What a matched unit is, and why it is not yet a source tree
 A matched unit (decomp skill, `matching-decomp.md`) is one guessed translation unit whose functions compile
@@ -34,21 +35,21 @@ to the original's bytes. To get there, units carry code whose only job is to ste
 
 What stays:
 - **the logic of every matched function**, NONMATCHING ones included: they are correct C++ that only
-  allocates registers differently (VVVVVV: 12, all register tie-breaks), so the rewrite uses them as they are;
+  allocates registers differently (typically register tie-breaks), so the rewrite uses them as they are;
 - **an address comment on every function** (`// 0x4013f0`): the decompile, the matched unit and the oracle
   stay one grep away, and the accounting (section 6) is done with it;
 - class layouts in the original member order, offsets as comments (`// +0x158`), so a memory dump of the
   original still reads against the class.
 
 What does not come over:
-- **library internals** compiled into the exe (VVVVVV: tinyxml2's 130 functions, stb_vorbis copies inside
+- **library internals** compiled into the exe (e.g. a C++ XML library's functions, an stb_vorbis copy inside
   the music units): the upstream library at the pinned version (step 1);
-- **CRT and STL instances** (55 template instances, 36 CRT objects): the compiler's own;
-- **dynamic initializers and atexit thunks** (`??__E`/`??__F`, 52): the compiler makes them again from the
+- **CRT and STL instances** (template instances, CRT objects): the compiler's own;
+- **dynamic initializers and atexit thunks** (`??__E`/`??__F`): the compiler makes them again from the
   global definitions (`Game game;`);
-- **Ghidra fragments** (`// STUB` of an address that is a jump target inside another function, 32): the
+- **Ghidra fragments** (`// STUB` of an address that is a jump target inside another function): the
   code is inside the parent's C++;
-- implicit members that a unit spelled out (VVVVVV: one copy constructor; the implicit one does the same).
+- implicit members that a unit spelled out (e.g. a copy constructor the implicit one equals).
 
 ## 2. Target layout
 One folder per subsystem, one `.cpp` per class or per original source file where the unit names and strings
@@ -58,12 +59,13 @@ src/
   main/       entry point (WinMain), main loop and state tables, platform glue
   game/       game state class, save/load, settings, menus, cutscene state machine, logic, render
   graphics/   renderer class, texture loading, screen/window, text boxes
-  entity/ map/ script/ music/ input/ editor/ localization/ filesystem/ util/    (VVVVVV's)
+  entity/ map/ script/ music/ input/ editor/ localization/ filesystem/ util/    (as the game has them)
   harness/    the differential-test hooks (references/harness.md), a module of its own
 ```
-Units are address-range guesses, so place by class first: every member of `Graphics` goes to
-`graphics/Graphics.cpp` whatever unit matched it; free functions go by unit, single functions by name or
-address where a unit mixed two source files (VVVVVV's unit 232 holds both `UTF8.c` and `VFormat.c`).
+Units are address-range guesses, so place by class first: every member of `Renderer` goes to
+`graphics/Renderer.cpp` whatever unit matched it; free functions go by unit, single functions by name or
+address where a unit mixed two source files (a unit that holds both a UTF-8 helper file and a string
+formatting file, say).
 The shared class headers of the decomp (`src_matched/<binary>/include/*.h`, one definition per class with
 offsets checked) are the starting point of the class headers.
 
@@ -99,27 +101,28 @@ What it does, per unit (sorted), after dropping `drop.lines` (e.g. `// CLFLAGS:`
    statics, its header gets the public functions (with the default arguments the units' declarations had)
    and `extern` globals; includes are computed from the names a file uses.
 
-VVVVVV, generator vs the project's own: 978 functions placed (the project's generator: 978), 145 stand-ins
-and 52 scaffolding helpers dropped (145, 52), 1,107 forward and 698 extern declarations dropped (same), 183
-stand-in types dropped (183), 51 helpers kept (51), 3 statics made public (3), 6 constants replaced by
-numbers (6): 56 `.cpp` + 56 `.h`, 78,804 lines, in about 6 s (Python) or under 1 s (Node). The hand-fixing phase took
-that to 60 + 49 files.
+On a project of about 270 units the generic generator reproduced a hand-written project generator exactly:
+about a thousand functions placed, about 150 stand-ins and 50 scaffolding helpers dropped, about 1,800
+forward and extern declarations and 180 stand-in types dropped, 50 inline helpers kept, a few statics made
+public and a few constants replaced by numbers, in about 6 s (Python) or under 1 s (Node). The hand-fixing
+phase then merged and split a handful of files.
 
-What was left for the hand phase (VVVVVV):
+What was left for the hand phase:
 - wrapper structs back to plain parameters (`StrRef`, `CodepointArg`, `EndArg`, `FlagsArg`, `U8Arg`,
   `DataArg`), alias unions to one member name, a no-op read that only ordered registers;
 - one name per exe function (the descriptive names of overloads: `fill_rect_xywh_rgb` -> `fill_rect`,
-  `print_string` -> `font::print`, `update_tag_int` -> `xml::update_tag`);
+  `print_string` -> `text::print`, `update_tag_int` -> `xml::update_tag`);
 - helpers a moved function needs in its new file, header include cycles, over-inclusion (a pruning pass:
   drop a project include when the file still compiles without it, `cl /Zs`);
-- signatures that one unit had narrowed (`FILESYSTEM_saveTiXml2Document` got its unused third parameter
-  back; `Screen::init` back to `const ScreenSettings*`);
+- signatures that one unit had narrowed (a save function got its unused third parameter back; a
+  `Window::init(const WindowSettings*)` that one unit had declared with a by-value struct);
 - macro names that collide once `windows.h` is in (`THIS` as a parameter name).
 
 ## 4. Constants: right value, wrong name
 Units guessed enums and flag macros locally. The number in the code is what the original was compiled with;
-the name may not be. VVVVVV: `PR_BOR` was `1<<17` in most units but `1<<4` in unit 139 and `0x8` in unit
-180; `EntityType_MOVING` was 1 in unit 052 and 2 in unit 049. Renaming by name would change behaviour.
+the name may not be. In one project a print flag `TEXT_BORDER` was `1<<17` in most units but `1<<4` in one
+unit and `0x8` in another; `ENTITY_MOVING` was 1 in one unit and 2 in another. Renaming by name would change
+behaviour.
 The generator evaluates every unit's own object-like macros and enum constants (a small C constant-expression
 evaluator: casts, shifts, ternaries, char literals) and compares them with the canonical values
 (`constants.canonical`, the enums and macros of the shared headers and of `constants.headers`). Where a unit's
@@ -127,9 +130,9 @@ value differs, the unit's uses are renamed to the canonical name that has the un
 (the prefix before the first `_`; `constants.families` maps prefixes such as `KEYBOARD` -> `SDLK`), else to
 the plain number (reported as `const_literal`). Names with no canonical counterpart stay unit-local, and
 `#define A B` aliases are resolved the same way. Pick canonical values from the code that decodes them
-(VVVVVV's print flags from `font::decode_print_flags` 0x428d70), not from a unit. VVVVVV: 27 units got
-renames (constants, aliases and variable names together), 6 values became numbers (a unit whose game-state
-enum was shifted by two).
+(print flags from the function that decodes them), not from a unit. Expect a tenth of the units to get
+renames (constants, aliases and variable names together) and a few values to become numbers (e.g. a unit
+whose game-state enum was shifted by two).
 
 ## 5. Data the units only declared
 Matched units often declare tables `extern`: they matched against the original's data, which nobody wrote
@@ -139,10 +142,10 @@ as source. The rewrite needs definitions:
   `dims`, `decl`, `format`; string tables become literals; pointers into another table become expressions
   through `symbols`, e.g. `glyph[12]`; floats with the fewest digits that read back to the same bits);
 - **`.bss` data** (no raw bytes in the section): a zero-initialised definition in the file that uses it.
-VVVVVV: 15 tables (tower and minitower maps 40x700/120/100/100 shorts, area music, the 57x57 area map, lab
-rooms, Arabic letter and ligature tables, credits lists, the button-glyph layout whose entries point into
-`glyph[]`) came from `.rdata`; `gen_data.py` reproduces all 15 token for token. About 90 other extern-only
-globals lie in `.bss` (VVVVVV: above 0x623800) and became zero definitions.
+In one project, 15 tables (large level maps of `short`s, per-area music, an area map, room tables, text
+shaping tables, credits lists, a glyph layout whose entries point into `glyph[]`) came from `.rdata`, and
+`gen_data.py` reproduced all of them token for token; about 90 other extern-only globals lay in `.bss` (above
+one address) and became zero definitions.
 
 ## 6. Accounting: every annotation has a place or a reason
 `scripts/cpp/account.py` puts every `// FUNCTION` and `// STUB` annotation in exactly one category, from
@@ -152,58 +155,59 @@ python3 -I $S/cpp/account.py --config rewrite/cpp/config.json --tree rewrite/cpp
     --names decompiled_named_exe/index.json --map rewrite/cpp/function_map.json
 ```
 Before the hand phase (no `--tree`) it checks that every game function has a destination (`planned`);
-afterwards that every one is in the tree. Exit 1 while anything is unaccounted. The VVVVVV table:
+afterwards that every one is in the tree. Exit 1 while anything is unaccounted. The categories (shares from
+one SDL2 game):
 
-| Annotations | Count | In the rewrite |
+| Annotations | Share | In the rewrite |
 |---|---|---|
-| `// FUNCTION` with C++ in a game unit | 977 | in the tree (976 + WinMain rewritten), all 12 NONMATCHING included |
-| `// FUNCTION` dropped with a reason | 1 | implicit copy constructor (`dropped` in the config) |
-| `// FUNCTION` dynamic initializer / atexit thunk | 52 | compiler-generated from the global definitions |
-| `// FUNCTION` in library units | 185 | tinyxml2 internals (130), STL/CRT instances (55): upstream library, compiler |
-| `// STUB` in library units | 36 | CRT objects |
-| `// STUB` Ghidra fragments | 32 | inside their parents' C++ |
-| `// STUB` rewritten | 1 | SDL2main's `main_getcmdline` (in the tree) |
+| `// FUNCTION` with C++ in a game unit | about 3/4 | in the tree (plus WinMain rewritten), every NONMATCHING included |
+| `// FUNCTION` dropped with a reason | a few | e.g. an implicit copy constructor (`dropped` in the config) |
+| `// FUNCTION` dynamic initializer / atexit thunk | about 4% | compiler-generated from the global definitions |
+| `// FUNCTION` in library units | about 15% | library internals, STL/CRT instances: upstream library, compiler |
+| `// STUB` in library units | about 3% | CRT objects |
+| `// STUB` Ghidra fragments | about 2% | inside their parents' C++ |
+| `// STUB` rewritten | a few | e.g. SDL2main's `main_getcmdline` (in the tree) |
 
-`tree_only` lists addresses the tree has but no annotation: functions written new (VVVVVV: `vlog_init`, a
-`jmp` the units missed) and the addresses on data tables. Record unannotated additions in the project's
-README: inlined helpers kept once (VVVVVV: 51), functions the original folded (`GOGNetwork` stubs).
+`tree_only` lists addresses the tree has but no annotation: functions written new (e.g. a logging init that
+was a `jmp` the units missed) and the addresses on data tables. Record unannotated additions in the project's
+README: inlined helpers kept once, functions the original folded (empty platform-service stubs).
 
 ## 7. Linking and running
 
 ### Global constructors run in link order
 MSVC runs each object file's dynamic initializers in the order the objects appear on the link line. The
-original's order is visible: its `??__E` thunks sit in address order in the initializer table (VVVVVV
-0x4db930..: `loc::*`, `soundTracks`, `musicTracks`, `script`, `cl`, `ed`, `help`, `graphics`, `music`,
-`game`, `key`, `map`, `obj`, `main`). When a constructor uses another global (VVVVVV:
-`customlevelclass()` -> `reset()` -> `script.textbox_colours`), an alphabetical link crashes at start
-(there: in `customlevelclass::reset` on a NULL map head). Fix: link the files that define global objects
-first, in the original's initializer order, then the rest. Do not reorder by hand later without rerunning
-the scenarios.
+original's order is visible: its `??__E` thunks sit in address order in the initializer table (e.g.
+localization tables, sound and music track lists, the script engine, the level editor, the renderer, the
+music player, the game, input, the map, the entity list, the main loop's state). When a constructor uses
+another global (e.g. `LevelEditor()` -> `reset()` -> a colour table in the script engine's global), an
+alphabetical link crashes at start (there: in `reset` on a NULL map head). Fix: link the files that define
+global objects first, in the original's initializer order, then the rest. Do not reorder by hand later
+without rerunning the scenarios.
 
 ### Library pieces the prebuilt libraries lack
-Some library code the original linked is not in the library's default build: VVVVVV's exe contains PhysFS's
-SDL_RWops bridge (`extras/physfsrwops.c`, 0x49c620..0x49ca50), which `physfs.lib` does not. Compile that file
+Some library code the original linked is not in the library's default build: an exe may contain PhysFS's
+SDL_RWops bridge (`extras/physfsrwops.c`), which `physfs.lib` does not. Compile that file
 from the pinned library source as it is, as part of the program. Check the inventory's library ranges
 against the built libraries' exports.
 
 ### The entry point
-A game that links `SDL2main` has its `WinMain` from SDL (VVVVVV: 0x4db080, with `main_getcmdline` 0x4db090).
+A game that links `SDL2main` has its `WinMain` from SDL (next to `main_getcmdline`).
 The `SDL2main.lib` of a current SDL devel package is built by a newer compiler than an old toolchain can
 link; write `WinMain` from SDL's `SDL_windows_main.c` of the pinned version (UTF-16 command line to UTF-8
 argv, then `SDL_main`) in `main/SDLMain.cpp`, and link `/SUBSYSTEM:WINDOWS` like the original.
 
 ### Build script
-A small project build script (VVVVVV: `rewrite/cpp/build.py`, about 200 lines) over `cpp_build.py`'s flags and
+A small project build script (e.g. `rewrite/cpp/build.py`, about 200 lines) over `cpp_build.py`'s flags and
 library list:
 - incremental: an object is rebuilt when its source or any project header it includes (recursively) is newer;
 - parallel: several `cl` processes at once, a few sources per process (a Wine process start costs about a
-  second; VVVVVV: 6 processes, 3 files each, about 20 s from clean, versus 75 s serial);
+  second; e.g. 6 processes, 3 files each: about 20 s from clean for 60 files, versus 75 s serial);
 - link order as above, extra library sources, `/MAP` for debugging, a `--debug` flavour (`/Od /Z7`);
 - errors only by default (`--warnings` for all), and a failed object is deleted so it is rebuilt next time.
 Check the fast build against a one-shot build once with the scenarios.
 
 ### The hooks as a module
-The harness contract (`references/harness.md`) is a module of its own (VVVVVV: `src/harness/Harness.cpp`,
+The harness contract (`references/harness.md`) is a module of its own (e.g. `src/harness/Harness.cpp`,
 adapted from the oracle's hook header; `scripts/harness/harness_core.h` holds the game-independent half),
 called from the main loop at the same points as in the oracle: after every
 input poll, at the end of the logic frame, at the end of the fixed-step function (both early returns and after
@@ -215,18 +219,18 @@ the original.
 2. **Accounting** clean: `account.py --tree` exits 0.
 3. **Scenarios**: `run_scenario.py` + `compare_traces.py` (`--ignore fb` first, then with `fb`), and `cmp` of
    every save file, for every scenario (`harness.md` section 9). A small project script that runs them all and
-   writes one summary is worth having (VVVVVV: `rewrite/cpp/tools/run_harness.py`, 1-2 minutes for three).
+   writes one summary is worth having (e.g. `rewrite/cpp/tools/run_harness.py`: 1-2 minutes for three).
 4. **Real input**: the harness replaces the input state, so it does not test the real input path. Post real
    key messages to the window: `scripts/cpp/keysend.cpp` (build it with the same compiler:
    `cl /nologo /O2 /MT keysend.cpp user32.lib`) finds the window by title and posts `WM_KEYDOWN`/`WM_KEYUP`
    with scan codes from a script (`keysend.exe "Game" "wait:3000 tap:z:150 down:right wait:800 up:right"`).
    Run it next to the game (under Wine: in the same prefix).
 5. **Screenshots** of the real window at chosen times, from a scratch copy of the game folder with an empty
-   save folder (`-basedir`), to look at: language menu, title menu, a started game. On macOS under Wine:
+   save folder (the game's own save-folder option), to look at: language menu, title menu, a started game. On macOS under Wine:
    `screencapture -l <window id>` with the window id from CoreGraphics' window list (as `run_wine.py` finds
    titles). Expect focus loss to pause the game (its own behaviour).
-6. **Not covered by scenarios** is not verified: list it (VVVVVV: editor, custom levels, time trials, the
-   later game, the ending, controller input, IME were compiled from the same matched code but not exercised).
+6. **Not covered by scenarios** is not verified: list it (e.g. the editor, user levels, extra play modes, the
+   later game, the ending, controller input, IME: compiled from the same matched code but not exercised).
    Add scenarios before calling those subsystems done.
 
 ## 9. Deliberate differences
@@ -235,8 +239,8 @@ project's README with the reason and why behaviour is the same:
 - a parameter restored that the matched definition had dropped because it was unused;
 - a reference overload replaced by the pointer one with the same code;
 - a non-clamping macro copy replaced by the clamping canonical one where the arguments are always in range
-  (VVVVVV: `PR_BRIGHTNESS` in the volume slider, 0..255);
-- one name for one variable (VVVVVV: `test_mode` = `loc::show_translator_menu`, 0x625a96).
+  (e.g. a brightness macro in a volume slider, always 0..255);
+- one name for one variable (two units' names for the same address).
 Code layout, inlining and addresses differ from the original by nature; the scenarios are the proof.
 
 ## 10. Without matched units
@@ -272,8 +276,9 @@ project (`--project`, default the current folder). Regexes are matched against t
 | `thunk_symbols`, `thunk_names`, `dropped` | account: thunk patterns (defaults `??__E/F`, `dynamic_initializer_for`...); `{address: reason}` |
 | `data.pe`, `data.symbols`, `data.items` | gen_data (section 5; full list in `gen_data.py --help`) |
 
-`scripts/examples/cpp_config_vvvvvv.json` is the validated case's config: placement of 273 units into 56
-files, the scaffolding patterns, renames, canonical constants and the 15 data tables.
+`scripts/examples/cpp_config_example.json` is a small made-up config that uses every key: placement of
+units into subsystem files, scaffolding patterns, renames, canonical constants and data tables. A real
+project's config has the same shape, only longer (dozens of files, hundreds of unit ids).
 
 ## Scripts
 | Script | Purpose |

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Ask an analysed Ghidra project about addresses, read-only (no external disassembler or MCP needed).
-# Usage: inspect.sh <project_dir> <binary file name, e.g. VVVVVV.exe> <0xaddr> [<0xaddr> ...]
+# Usage: inspect.sh <project_dir> <binary file name, e.g. Game.exe> <0xaddr> [<0xaddr> ...]
 # Prints the code unit, containing data/function and all references for each address (Inspect.java).
 set -eu
 [ $# -ge 3 ] || { sed -n '2,4p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
