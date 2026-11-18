@@ -16,6 +16,7 @@ import os from 'node:os'
 import path from 'node:path'
 import * as L from '../lib/rwlib.mjs'
 import { makeFixtures, w } from './fakes.mjs'
+import { CPP_CONFIG, cppProject, writePEs } from './cpp_fixtures.mjs'
 
 const argv = process.argv.slice(2)
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d }
@@ -28,7 +29,8 @@ const JS = L.JS_DIR
 const PORTS = {
   compare_traces: 'compare_traces', run_scenario: 'run_scenario', record_oracle: 'record_oracle', run_wine: 'run_wine',
   wintools: 'wintools', build_libs: 'build_libs', cpp_build: 'cpp_build', build_oracle: 'build_oracle',
-  'rust_gnu/gen_defs': 'rust_gnu/gen_defs', 'rust_gnu/dlltool': 'rust_gnu/dlltool'
+  'rust_gnu/gen_defs': 'rust_gnu/gen_defs', 'rust_gnu/dlltool': 'rust_gnu/dlltool',
+  'cpp/cppsplit': 'cpp/cppsplit', 'cpp/account': 'cpp/account', 'cpp/emit': 'cpp/emit', 'cpp/gen_data': 'cpp/gen_data'
 }
 
 if (argv.includes('--sync-docs')) {
@@ -230,6 +232,54 @@ add('cpp_build', 'usage: no sources', ['--out', 'x.exe'])
 add('build_oracle', 'prepare only', ['--prepare-only'], { setup: () => oracleProject() })
 add('build_oracle', 'full (fake pipeline)', [], { setup: () => oracleProject() })
 add('build_oracle', 'edit not found', ['--prepare-only'], { setup: () => oracleProject(true) })
+// cpp/cppsplit
+const U = n => 'src_matched/GAME/' + n
+add('cpp/cppsplit', 'items, module', ['--items', '--module', 'GAME', U('001_main.cpp')], { setup: () => cppProject(W) })
+add('cpp/cppsplit', 'summary, json', [U('001_main.cpp'), U('002_util.cpp'), U('003_crt.cpp'), U('include/Game.h'), '--json', 'out/split.json'], { setup: () => cppProject(W) })
+add('cpp/cppsplit', 'crlf, all modules', ['--items', U('001_main.cpp')], { setup: () => cppProject(W, { crlf: true }) })
+add('cpp/cppsplit', 'missing file', [U('001_main.cpp'), 'nope.cpp'], { setup: () => cppProject(W) })
+add('cpp/cppsplit', 'usage: no files', [])
+add('cpp/cppsplit', 'help', ['--help'])
+// cpp/account
+add('cpp/account', 'tree, names, map', ['--config', 'cpp.json', '--tree', 'rewrite/src', '--names', 'names.json', '--map', 'out/map.json'], { setup: () => cppProject(W) })
+add('cpp/account', 'planned (no tree)', ['--config', 'cpp.json', '--names', 'names.json'], { setup: () => cppProject(W) })
+add('cpp/account', 'lost function', ['--config', 'cpp.json', '--tree', 'rewrite/src'], { setup: () => cppProject(W, { lose: true }) })
+add('cpp/account', 'no destination', ['--config', 'cpp.json', '--map', 'map.json'], { setup: () => cppProject(W, { cfg: { default_dest: null } }) })
+add('cpp/account', 'units option', ['--config', 'cpp.json', '--units', 'src_matched/GAME', '--project', 'nowhere'], { setup: () => cppProject(W) })
+add('cpp/account', 'bad config', ['--config', 'broken.json'], { setup: () => { cppProject(W); w(path.join(W, 'broken.json'), '{"units": ') } })
+add('cpp/account', 'no units', ['--config', 'cpp.json', '--project', 'nowhere'], { setup: () => cppProject(W) })
+add('cpp/account', 'no tree', ['--config', 'cpp.json', '--tree', 'missing'], { setup: () => cppProject(W) })
+add('cpp/account', 'bad names', ['--config', 'cpp.json', '--names', 'cpp'], { setup: () => { cppProject(W); w(path.join(W, 'cpp'), 'not json') } })
+add('cpp/account', 'usage: no config', ['--tree', 'x'])
+// cpp/emit
+add('cpp/emit', 'generate + report', ['--config', 'cpp.json', '--out', 'out/src', '--report', 'out/report.json'], { setup: () => cppProject(W) })
+add('cpp/emit', 'crlf units', ['--config', 'cpp.json', '--out', 'gen'], { setup: () => cppProject(W, { crlf: true }) })
+add('cpp/emit', 'unplaced function', ['--config', 'cpp.json', '--out', 'gen', '--report', 'r.json'], { setup: () => cppProject(W, { cfg: { default_dest: null } }) })
+add('cpp/emit', 'constants header', ['--config', 'cpp.json', '--out', 'gen'], {
+  setup: () => {
+    cppProject(W, { cfg: { constants: { ...CPP_CONFIG.constants, headers: ['extra/consts.h'] }, headers: {} } })
+    w(path.join(W, 'extra', 'consts.h'), '#define FLAG_SMALL (1 << 4)\nenum Mode { MODE_IDLE, MODE_RUN, MODE_JUMP };\n#define BAD (1 / 0)\n#define CAST ((int) 7 + 0x10 - 010 + \'A\')\n')
+  }
+})
+add('cpp/emit', 'missing constants header', ['--config', 'cpp.json', '--out', 'gen'], { setup: () => cppProject(W, { cfg: { constants: { headers: ['nope.h'] } } }) })
+add('cpp/emit', 'missing shared header', ['--config', 'cpp.json', '--out', 'gen'], { setup: () => cppProject(W, { cfg: { headers: { 'include/Nope.h': 'x/Nope.h' } } }) })
+add('cpp/emit', 'bad config', ['--config', 'nope.json', '--out', 'gen'])
+add('cpp/emit', 'usage: no --out', ['--config', 'cpp.json'])
+add('cpp/emit', 'help', ['-h'])
+// cpp/gen_data
+add('cpp/gen_data', 'all types, stdout', ['--config', 'data.json'], { setup: () => writePEs(W) })
+add('cpp/gen_data', 'to a file', ['--config', 'data.json', '--out', 'out/tables.inc'], { setup: () => writePEs(W) })
+add('cpp/gen_data', 'only', ['--config', 'data.json', '--only', 'zeros,names'], { setup: () => writePEs(W) })
+add('cpp/gen_data', 'only: no such item', ['--config', 'data.json', '--only', 'nope'], { setup: () => writePEs(W) })
+add('cpp/gen_data', 'PE32+, data section', ['--config', 'data64.json'], { setup: () => writePEs(W) })
+add('cpp/gen_data', 'not a PE', ['--config', 'data.json', '--pe', 'game/notpe.exe'], { setup: () => writePEs(W) })
+add('cpp/gen_data', 'missing exe', ['--config', 'data.json', '--pe', 'game/none.exe'], { setup: () => writePEs(W) })
+add('cpp/gen_data', 'no exe in config', ['--config', 'empty.json'], { setup: () => { writePEs(W); w(path.join(W, 'empty.json'), '{"items": []}') } })
+add('cpp/gen_data', 'bad config', ['--config', 'missing.json'])
+for (const b of ['bad_addr', 'bad_range', 'bad_type', 'bad_format', 'bad_key', 'bad_number', 'bad_nan', 'bad_struct', 'bad_perline']) {
+  add('cpp/gen_data', b, ['--config', b + '.json'], { setup: () => writePEs(W) })
+}
+add('cpp/gen_data', 'help', ['--help'])
 
 // ------------------------------------------------------------------------------------------ running
 const MASKS = [
@@ -246,7 +296,7 @@ function snapshot (dir) {
       const st = fs.lstatSync(path.join(dir, r))
       if (st.isDirectory()) { files.set(r + '/', 'dir'); walk(r) } else {
         const b = fs.readFileSync(path.join(dir, r))
-        files.set(r, /\.(json|log|txt|trace|def|h)$/.test(n) ? mask(b.toString('utf8')) : b.toString('base64'))
+        files.set(r, /\.(json|log|txt|trace|def|h|cpp|inc|md)$/.test(n) ? mask(b.toString('utf8')) : b.toString('base64'))
       }
     }
   }
@@ -266,7 +316,7 @@ function runSide (c, side) {
 }
 const results = []; let pyMs = 0; let jsMs = 0
 for (const c of cases) {
-  if (ONLY && !ONLY.split(',').includes(c.script.replace('rust_gnu/', ''))) continue
+  if (ONLY && !ONLY.split(',').includes(c.script.replace(/^(rust_gnu|cpp)\//, ''))) continue
   const p = runSide(c, 'py'); const j = runSide(c, 'js')
   pyMs += p.ms; jsMs += j.ms
   const diffs = []

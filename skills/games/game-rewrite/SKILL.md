@@ -32,7 +32,7 @@ Details are in the references; read the one for each step before starting it.
 | `references/inventory.md` | step 1: game code vs libraries vs runtime, pinning library versions from the binary, static or DLL |
 | `references/toolchains.md` | step 2: C++ (original MSVC, or current MSVC / clang-cl), Rust (windows targets, raw-dylib, cross build without MinGW), `libraries.json`, the hello gate, Wine vs Windows |
 | `references/harness.md` | steps 3 and 5: the oracle, hook points, determinism, replay and trace formats, scenarios, comparison, the hooks in the rewrite |
-| `references/cpp.md` | (planned) a C++ rewrite: from matched units to a clean tree; headers; what to drop |
+| `references/cpp.md` | step 4 in C++: from matched units (or pseudocode) to a clean tree by subsystem; the one-shot generator; what is scaffolding; extern-only data; link order; entry point; build; accounting; testing with real input |
 | `references/rust.md` | (planned) a Rust rewrite: module layout, FFI to libraries, translating MSVC C++ idioms |
 | `references/orchestration.md` | (planned) splitting the rewrite across agents, review, the comparison loop |
 
@@ -60,8 +60,8 @@ git, like the decomp skill's outputs.
 ## Scripts
 All in `scripts/`, Python 3.9+ standard library only, run as `python3 -I <script>`; `--help` on each. Each
 has a JavaScript port in `scripts/js/` (Node 20+ built-ins only, same command line, output and files);
-`node scripts/js/parity/run_all.mjs` runs both on synthetic inputs (fake game, fake Wine and compiler) and
-must report every case identical. Change both sides together; `--sync-docs` copies docstrings to the ports.
+`node scripts/js/parity/run_all.mjs` runs both on synthetic inputs (fake game, fake Wine and compiler,
+made-up matched units, a tiny PE) and must report every case identical. Change both sides together; `--sync-docs` copies docstrings to the ports.
 
 | Script | Step | Purpose |
 |---|---|---|
@@ -77,10 +77,18 @@ must report every case identical. Change both sides together; `--sync-docs` copi
 | `run_scenario.py` | 3, 5 | one replay with one exe: scratch copy, contract variables, retries, trace and saves |
 | `record_oracle.py` | 3 | N runs per scenario, determinism report, the oracle's traces and saves |
 | `compare_traces.py` | 5 | frame-by-frame, field-aware trace comparison, first divergence, JSON summary |
+| `cpp/cppsplit.py` | 4 | split matched units into top-level items with their annotations, classified |
+| `cpp/account.py` | 4 | every `// FUNCTION`/`// STUB` annotation -> output file or reason; unaccounted ones fail |
+| `cpp/emit.py` | 4 | one-shot generator: place annotated functions by config, drop scaffolding, canonical constants, headers |
+| `cpp/gen_data.py` | 4 | C++ definitions of extern-only data, read from the exe's sections |
+| `cpp/keysend.cpp` | 4, 6 | Win32 tool: post scripted key presses to a window by title (real input) |
 | `examples/libraries_vvvvvv.json` | 1, 2 | the validated case's complete `libraries.json` |
+| `examples/cpp_config_vvvvvv.json` | 4 | the validated case's cpp config (placement, scaffolding patterns, renames, constants, data tables) |
 
 ## Validated on
 VVVVVV 2.4.4 (VS2010 SP1, SDL2, seven static libraries): libraries pinned from the binary, both toolchains'
 hello programs `RESULT: OK` under Wine on macOS, an oracle with 4 edited functions whose 3 scenarios (1,101
-to 1,601 frames) gave byte-identical traces and saves in 3 of 3 runs each. The rewrite itself (steps 4-6)
-has not been done yet.
+to 1,601 frames) gave byte-identical traces and saves in 3 of 3 runs each. The C++ rewrite: 976 game
+functions brought over from the matched units (all 12 NONMATCHING included) plus a rewritten WinMain, in 60
+`.cpp` and 49 `.h` files; it builds with VS2010 and all 3 scenarios are identical to the oracle, framebuffer
+hash included, with byte-identical saves. The Rust rewrite is in progress.
