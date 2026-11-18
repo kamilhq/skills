@@ -453,6 +453,10 @@ async function cmd_intake(proj, a) {
   const m = manifest(game)
   const res = { command: 'intake', source: how, game: proj.rel(game), files: m.get('files').size,
     hashdb: { 0: 'PASS', 1: 'FAIL', 2: 'no goggame-*.hashdb' }[hp.returncode] ?? hp.returncode }
+  makedirs(proj.p.reports)
+  const pc = run([NODE, tool('protection_check.mjs'), game, '--json', proj.report('protection.json')], proj, { capture: true })
+  if (pc.stderr) log(pc.stderr.replace(/\n+$/, ''))
+  res.protection = { 0: 'clean', 1: 'FOUND: copy protection or packer (reports/protection.json); stop' }[pc.returncode] ?? 'error'
   const man = proj.p.manifest
   let manOk
   if (exists(man)) {
@@ -469,8 +473,7 @@ async function cmd_intake(proj, a) {
     res.manifest = { path: proj.rel(man), written: true }
     manOk = true
   }
-  const ok = manOk && (hp.returncode === 0 || (hp.returncode === 2 && 'compared' in res.manifest))
-  makedirs(proj.p.reports)
+  const ok = manOk && (hp.returncode === 0 || (hp.returncode === 2 && 'compared' in res.manifest)) && pc.returncode === 0
   dumpJson({ ...res, ok }, proj.report('intake.json'))
   return [ok, res]
 }

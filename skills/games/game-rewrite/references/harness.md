@@ -15,6 +15,9 @@ and the rewrite is another. Write the contract down per game (`rewrite/harness/H
 any hook code.
 
 ## 1. The oracle
+In publishable mode (`cleanroom.md`) the oracle and its source stay with the analysts and the coordinator;
+implementers get the scenarios, the oracle's traces and the trace contract in words, never the oracle's
+source or binary.
 **From matched source (preferred).** The decomp skill's phase 6 gives C++ for the game's main loop. Copy
 the source set, add the hook code and a few calls in the main-loop functions, and build it with the
 pipeline's source build. Those functions then no longer match and are linked from the edited C++. Every

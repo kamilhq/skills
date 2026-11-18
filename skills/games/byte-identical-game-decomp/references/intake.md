@@ -48,6 +48,23 @@ python3 -I scripts/intake.py compare work/manifest_game.json manifests/<game>_<v
   another machine prove they started from the same version. If versions differ (GOG patches), say so and
   keep per-version manifests.
 
+## Copy protection (gate)
+```bash
+python3 -I scripts/protection_check.py work/game --json reports/protection.json
+```
+Before any analysis, check the game for copy protection and packers: getting around them is unlawful in
+itself (`references/legal-and-repo.md`), whatever the purpose. The script looks at file names of protection
+components, PE section names, imported DLLs and a known signature string (SafeDisc, SecuROM, StarForce,
+LaserLock, CD-Cops, the Steam DRM wrapper; UPX, ASPack, MPRESS, PECompact, Petite, NsPack, Themida /
+WinLicense, VMProtect, Enigma), and at the entry point of every PE (outside every section, in a writable
+code section, or in a section with entropy >= 7.2 bits per byte).
+- `verdict: clean` (exit 0): continue. Steamworks or GOG Galaxy imports are listed as `info`: APIs, not DRM.
+- `verdict: protected` (exit 1): stop. Tell the user what was found and that the skill does not remove,
+  bypass or emulate protections; a DRM-free release of the same game (GOG) can be used instead.
+- `verdict: review` (exit 1): only heuristic warnings (an unknown packer is likely, not certain). Show them
+  to the user and continue only on their decision; never unpack the binary.
+`pipeline.py intake` runs it and fails its gate on any finding. GOG releases have passed so far.
+
 ## Notes
 - Installers sometimes contain several language variants or optional components: check `inno.py info` /
   `inno.py list` and extract the set the user's install uses.

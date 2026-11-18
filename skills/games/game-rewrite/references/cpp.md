@@ -1,5 +1,8 @@
 # Step 4 (C++) - From matched units to a clean source tree
 
+**Private mode only.** This translates the matched code, so the result is a derivative work of the original: it
+stays on the user's machine and is never published. For a rewrite others may download, see `cleanroom.md`.
+
 Output: the game's code as an ordinary C++ project, one file per subsystem, one definition of every class,
 global and function, that builds with the step-2 toolchain against the step-1 libraries and passes the
 step-3 scenarios. Gate: **it builds, every function annotation of the decomp is accounted for, and every

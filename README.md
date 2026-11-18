@@ -53,10 +53,30 @@ Two skills that work together, for 32-bit Windows games built with Microsoft Vis
 | Skill | What it does |
 |---|---|
 | [`byte-identical-game-decomp`](skills/games/byte-identical-game-decomp/SKILL.md) | From the installer to decoded data files, complete recovered and named code, a byte-identical rebuild of every binary, and C++ matched function by function with the original compiler. |
-| [`game-rewrite`](skills/games/game-rewrite/SKILL.md) | A full source rewrite in C++ or Rust that builds a native Windows exe, uses the game's own data, and is checked frame by frame against the original with a differential test harness. Starts from the decomp skill's results. |
+| [`game-rewrite`](skills/games/game-rewrite/SKILL.md) | A full source rewrite in C++ or Rust that builds a native Windows exe, uses the game's own data, and is checked frame by frame against the original with a differential test harness. Starts from the decomp skill's results. Private (translated, kept local) or publishable (clean room, with a release gate). |
 
 Every phase ends at a gate a script checks: SHA-256 identity for data and binaries, zero orphan
-instructions for code recovery, identical per-frame traces and save files for a rewrite.
+instructions for code recovery, no copy protection on the game, identical per-frame traces and save files
+for a rewrite, and for a rewrite meant for release, a clean-room record and a check for copied code.
+
+## Legal frame
+
+The skills work only on a game you own, never remove or bypass copy protection (they stop when they find
+one), and keep everything derived from the game on your machine. Copyright protects the original's code
+and assets, not its behaviour or file formats, so there are two ways to rewrite:
+
+- **Private** (default): the rewrite is translated from the decompilation. That makes it a derivative work of
+  the original code, so it stays local, like the decompilation itself.
+- **Publishable**: a clean-room rewrite. Analyst agents read the decompilation and write behaviour specs in
+  their own words; fresh implementer sessions that never see the decompilation write the code from those
+  specs and the original's frame traces. `cleanroom.py` lints the specs and keeps a hash-chained log of every
+  hand-over; `release_check.py` must pass before publishing (no copied code, address markers, original names,
+  embedded game data or assets; licence and notices present). The game's data is always read from your own
+  installation at run time.
+
+Details and the law behind them: [`legal-and-repo.md`](skills/games/byte-identical-game-decomp/references/legal-and-repo.md),
+[`cleanroom.md`](skills/games/game-rewrite/references/cleanroom.md). This is not legal advice; laws differ by
+country.
 
 ## Use
 
@@ -106,8 +126,9 @@ skills/games/
       js/              Node.js ports, lib/ (ported algorithms), parity/ (tests)
   game-rewrite/
     SKILL.md
-    references/        Inventory, toolchains, harness, C++, Rust, orchestration
-    scripts/           Library builds, oracle, scenario runner, trace comparison, C++ and Rust tools
+    references/        Inventory, toolchains, harness, C++, Rust, clean room, orchestration
+    scripts/           Library builds, oracle, scenario runner, trace comparison, C++ and Rust tools,
+                       clean-room record and release gate
       js/              Node.js ports and parity tests
       examples/        Made-up example configs
 ```
@@ -116,7 +137,8 @@ skills/games/
 
 Nothing derived from a game: no game files, decoded data, decompiled code, names, traces or rewritten
 source. The skills keep all of that in your local project, out of git, and keep any repository with game
-content private. You need your own copy of the game, and of its original compiler for matching.
+content private. You need your own copy of the game, and of its original compiler for matching. Nothing to
+remove or get around copy protection either.
 
 # Apple skills
 

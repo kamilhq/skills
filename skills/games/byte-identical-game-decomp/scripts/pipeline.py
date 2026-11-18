@@ -252,6 +252,13 @@ def cmd_intake(proj, a):
     m = intake.manifest(game)
     res = dict(command='intake', source=how, game=proj.rel(game), files=len(m['files']),
                hashdb={0: 'PASS', 1: 'FAIL', 2: 'no goggame-*.hashdb'}.get(hp.returncode, hp.returncode))
+    os.makedirs(proj.p['reports'], exist_ok=True)
+    pc = run(PY + [os.path.join(HERE, 'protection_check.py'), game, '--json', proj.report('protection.json')], proj,
+             capture=True)
+    if pc.stderr:
+        log(pc.stderr.rstrip('\n'))
+    res['protection'] = {0: 'clean', 1: 'FOUND: copy protection or packer (reports/protection.json); stop'}.get(
+        pc.returncode, 'error')
     man = proj.p['manifest']
     if os.path.exists(man):
         tmp = os.path.join(proj.p['build'], 'work', 'manifest_intake.json')
@@ -266,8 +273,8 @@ def cmd_intake(proj, a):
         json.dump(m, open(man, 'w'), indent=1)
         res['manifest'] = dict(path=proj.rel(man), written=True)
         man_ok = True
-    ok = man_ok and (hp.returncode == 0 or (hp.returncode == 2 and 'compared' in res['manifest']))
-    os.makedirs(proj.p['reports'], exist_ok=True)
+    ok = man_ok and (hp.returncode == 0 or (hp.returncode == 2 and 'compared' in res['manifest'])) and \
+        pc.returncode == 0
     json.dump(dict(res, ok=ok), open(proj.report('intake.json'), 'w'), indent=1)
     return ok, res
 

@@ -180,6 +180,15 @@ twenty scenarios run one after the other, less with one Wine prefix per parallel
 | Rust rewrite | about 950 functions (almost all from stubs), about 30 modules, about 80,000 lines (a third generated), 8 waves of 13-25 min, integration about 2 h |
 | result | both rewrites identical to the oracle in every scenario, framebuffer hash and saves included; extra Rust-vs-C++ fuzz replays identical |
 
+## 10. Publishable mode
+In a clean-room rewrite (`cleanroom.md`) the sequence changes: toolchain and harness/oracle (rows 1-2) stay
+as they are; the C++ consolidation, the Rust foundation from stubs and the translation waves (rows 3-5) are
+replaced by analysts writing specs and fresh implementer sessions writing their own design from packed
+workspaces; widening the scenarios (row 4a) is unchanged and serves both. Never fork the coordinator into an
+implementer (a fork carries the decompilation in its context), and never give an implementer the C++ or Rust
+rewrite as a reference: in this mode the comparison loop's step 2 (reading both rewrites side by side) is
+an analyst's job, and the answer goes back as a spec.
+
 ## Checklist
 - [ ] Machine kept awake; one Wine prefix per concurrent run.
 - [ ] Toolchain, harness and C++ consolidation each done by one agent, in that order.

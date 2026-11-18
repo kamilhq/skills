@@ -8,7 +8,7 @@ tools it calls are generic.
 ```bash
 P=.claude/skills/byte-identical-game-decomp/scripts
 python3 -I $P/pipeline.py init --game "Name 1.0"            # decomp.json skeleton, .gitignore, folders
-python3 -I $P/pipeline.py intake <setup.exe>                # phase 1: extract + manifest + GOG hashdb gate
+python3 -I $P/pipeline.py intake <setup.exe>                # phase 1: extract + manifest + GOG hashdb + copy-protection gate
 python3 -I $P/pipeline.py inventory                         # phase 2: census -> reports/inventory.json
 python3 -I $P/pipeline.py archives                          # extract the configured archives -> extracted/
 python3 -I $P/pipeline.py decode [--module M]               # phase 3: verify every module, then the completeness gate
@@ -50,6 +50,9 @@ exits 0 only when its gate holds.
   "run": {"wineprefix": "~/.wine", "exe": "Game.exe"}
 }
 ```
+- `mode` (optional): `"private"` (default) or `"publishable"`, chosen in phase 0
+  (`references/legal-and-repo.md`). No pipeline command changes behaviour with it; it tells every later
+  session (and the game-rewrite skill) which rules the project follows.
 - `paths` are relative to the project (absolute paths work too); any can be omitted (these are the
   defaults). Two more: `work` (default `work`: the installer extraction `work/installer`, Ghidra projects
   `work/ghidra_<stem>`) and `manifest` (default `manifests/game.json`: `intake` writes the SHA-256
@@ -82,7 +85,7 @@ exits 0 only when its gate holds.
 ## Where the results go
 | Command | Writes |
 |---|---|
-| intake | `paths.game`, `<work>/installer`, the manifest, `reports/intake.json` |
+| intake | `paths.game`, `<work>/installer`, the manifest, `reports/intake.json`, `reports/protection.json` |
 | inventory | `reports/inventory.json` (gate: every file without a known magic is handled by a configured module or is a binary) |
 | archives | `extracted/<archive>/`, `extracted/_members.json` (`--force` to extract again) |
 | decode | `decoded/<module>/`, `reports/<tree>/<module>.json`, `reports/completeness.json` |

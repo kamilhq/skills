@@ -1,5 +1,8 @@
 # Step 4 (Rust) - A Rust rewrite that behaves bit for bit
 
+**Private mode only.** This translates the matched code, so the result is a derivative work of the original: it
+stays on the user's machine and is never published. For a rewrite others may download, see `cleanroom.md`.
+
 Output: the game's code as a Rust crate, one module per subsystem, every function of the original translated
 under its address, that builds for 32-bit Windows against the step-1 libraries (as DLLs) and runs with the
 game's own data. Gate: **it builds, no stub is left, and every scenario is identical to the oracle (traces

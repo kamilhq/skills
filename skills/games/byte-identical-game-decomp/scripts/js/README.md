@@ -34,6 +34,7 @@ wrappers (`*.sh`) are not ported: Ghidra has no JavaScript scripting.
 | Port | Python original | Library helpers it adds |
 |---|---|---|
 | `inno.mjs`, `intake.mjs`, `inventory.mjs` | inno.py, intake.py, inventory.py | `lib/lzma.mjs` (raw LZMA1/LZMA2 decoder), `lib/bzip2.mjs`, `lib/zipfile.mjs` (zipfile reading) |
+| `protection_check.mjs` | protection_check.py | |
 | `verify.mjs`, `pngio.mjs` | verify.py, pngio.py | `lib/pyzlib.mjs` (zlib with Python's buffer/flush behaviour) |
 | `objcmp.mjs`, `objcmp_selftest.mjs` | objcmp.py, objcmp_selftest.py | `lib/difflib.mjs` (SequenceMatcher) |
 | `reassemble.mjs`, `peek.mjs`, `rich_header.mjs`, `phase6_skeleton.mjs`, `code_coverage_check.mjs`, `build_features.mjs` | same names | |

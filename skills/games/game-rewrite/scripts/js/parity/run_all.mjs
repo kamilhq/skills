@@ -18,10 +18,12 @@ import * as L from '../lib/rwlib.mjs'
 import { makeFixtures, w } from './fakes.mjs'
 import { CPP_CONFIG, cppProject, writePEs } from './cpp_fixtures.mjs'
 import { rustProject, rustBadInputs, replaceProject } from './rust_fixtures.mjs'
+import { cleanProject, EPOCH } from './clean_fixtures.mjs'
 
 const argv = process.argv.slice(2)
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d }
 const PY = opt('--python', 'python3')
+process.env.PARITY_PYTHON = PY
 const ONLY = opt('--only', null)
 const KEEP = argv.includes('--keep')
 const SCRIPTS = L.SCRIPTS
@@ -32,7 +34,8 @@ const PORTS = {
   wintools: 'wintools', build_libs: 'build_libs', cpp_build: 'cpp_build', build_oracle: 'build_oracle',
   'rust_gnu/gen_defs': 'rust_gnu/gen_defs', 'rust_gnu/dlltool': 'rust_gnu/dlltool',
   'cpp/cppsplit': 'cpp/cppsplit', 'cpp/account': 'cpp/account', 'cpp/emit': 'cpp/emit', 'cpp/gen_data': 'cpp/gen_data',
-  'rust/gen_skeleton': 'rust/gen_skeleton', 'rust/replace_fn': 'rust/replace_fn'
+  'rust/gen_skeleton': 'rust/gen_skeleton', 'rust/replace_fn': 'rust/replace_fn',
+  cleanroom: 'cleanroom', release_check: 'release_check'
 }
 
 if (argv.includes('--sync-docs')) {
@@ -329,6 +332,74 @@ add('rust/replace_fn', 'no address lines', ['src/m.rs', 'none.rs'], { setup: () 
 add('rust/replace_fn', 'missing target', ['nope.rs', 'new.rs'], { setup: () => replaceProject(W) })
 add('rust/replace_fn', 'usage', ['src/m.rs'])
 add('rust/replace_fn', 'help', ['-h'])
+// cleanroom
+const CE = { env: { SOURCE_DATE_EPOCH: EPOCH } }
+const cr = (name, args, o = {}) => add('cleanroom', name, args, { ...CE, setup: () => cleanProject(W, o) })
+for (const [n, a] of [['no command', []], ['help', ['-h']], ['unknown', ['bogus']], ['sub help', ['pack', '--help']],
+  ['init extra arg', ['init', 'x']], ['pack: missing --out', ['pack', '--wave', 'w']], ['record: missing --event', ['record', '--wave', 'w']],
+  ['bad option', ['verify', '--bogus']]]) cr('usage: ' + n, a)
+cr('init', ['init'])
+cr('init twice', ['init'], { log: 'init' })
+cr('init: custom dir and log', ['init'], { cleanroom: { dir: 'cr', log: 'cr/history/log.jsonl', specs: 'cr/s' } })
+cr('verify: no log', ['verify'])
+cr('verify: intact', ['verify'], { log: 'full' })
+cr('verify: tampered line', ['verify'], { log: 'tampered' })
+cr('verify: garbage lines', ['verify'], { log: 'garbage' })
+cr('verify: no init', ['verify'], { log: 'noinit' })
+cr('lint: clean specs', ['lint', 'cleanroom/specs/player.md', 'cleanroom/specs/more/world.md'])
+cr('lint: bad specs', ['lint', 'specs_bad/ghidra.md', 'specs_bad/untagged.md', 'specs_bad/loose.md', 'specs_bad/unclosed.md', 'specs_bad/notes.txt', '--json', 'lint.json'])
+cr('lint: no files', ['lint'])
+cr('lint: missing file', ['lint', 'nope.md'])
+cr('lint: folder', ['lint', 'cleanroom/specs'])
+cr('lint: thresholds', ['lint', 'specs_bad/loose.md', 'specs_bad/notes.txt'], { cleanroom: { thresholds: { spec_overlap: 1000, spec_code_lines: 1000 } } })
+cr('pack: no log', ['pack', '--wave', 'w', '--out', 'ws', 'cleanroom/specs'])
+cr('pack: folder and file', ['pack', '--wave', 'physics', '--out', 'ws/physics', '--note', 'first wave, "quoted" é', 'cleanroom/specs', 'gamedir/data/level1.dat', 'cleanroom/specs/player.md'], { log: 'init' })
+cr('pack: out outside the project', ['pack', '--wave', 'w', '--out', '../ws_out', 'cleanroom/specs/player.md'], { log: 'init' })
+cr('pack: forbidden inputs', ['pack', '--wave', 'w', '--out', 'ws', 'cleanroom/specs', 'src_matched/MATCHING_NOTES.md', 'decompiled_exe', 'analysis/GAME/names.tsv', 'build/oracle'], { log: 'init' })
+cr('pack: failing lint', ['pack', '--wave', 'w', '--out', 'ws', 'specs_bad'], { log: 'init' })
+cr('pack: outside and symlink', ['pack', '--wave', 'w', '--out', 'ws', '../outside.md', 'cleanroom/link.md'], { log: 'init' })
+cr('pack: missing input', ['pack', '--wave', 'w', '--out', 'ws', 'nope.md'], { log: 'init' })
+cr('pack: no inputs', ['pack', '--wave', 'w', '--out', 'ws'], { log: 'init' })
+cr('pack: out not empty', ['pack', '--wave', 'w', '--out', 'cleanroom', 'cleanroom/specs'], { log: 'init' })
+cr('pack: out in forbidden area', ['pack', '--wave', 'w', '--out', 'src_matched/ws', 'cleanroom/specs'], { log: 'init' })
+cr('pack: custom forbidden', ['pack', '--wave', 'w', '--out', 'ws', 'cleanroom/specs', 'gamedir'], { log: 'init', cleanroom: { forbidden: ['game*', '**/*.md'] } })
+cr('record: question with files', ['record', '--wave', 'physics', '--event', 'answer', '--note', 'see the spec', 'cleanroom/specs/more'], { log: 'full' })
+cr('record: no files', ['record', '--wave', 'physics', '--event', 'handoff'], { log: 'full' })
+cr('record: reserved event', ['record', '--wave', 'w', '--event', 'pack'], { log: 'full' })
+cr('record: bad event', ['record', '--wave', 'w', '--event', 'Ask!'], { log: 'full' })
+cr('record: refused file', ['record', '--wave', 'w', '--event', 'answer', 'specs_bad/ghidra.md'], { log: 'full' })
+cr('record: no log', ['record', '--wave', 'w', '--event', 'answer'])
+// release_check
+const rc = (name, args, o = {}) => add('release_check', name, args, { ...CE, setup: () => cleanProject(W, o) })
+rc('clean tree passes', [], { log: 'full' })
+rc('clean tree, json and quiet', ['--json', 'report.json', '--quiet'], { log: 'full' })
+rc('clean tree without log', [])
+rc('clean tree, tampered log', [], { log: 'tampered' })
+rc('clean tree, log without pack', [], { log: 'init' })
+rc('clean tree, log not required', [], { cleanroom: { require_log: false } })
+rc('bad tree fails every check', ['rewrite/bad'], { log: 'full' })
+rc('bad tree, more than 200 findings', ['rewrite/bad'], { log: 'full', many: true })
+rc('bad tree, names from TSV', ['rewrite/bad'], { log: 'full', cleanroom: { names: ['analysis/GAME/names.tsv'] } })
+rc('bad tree, allow-list', ['rewrite/bad', '--quiet'], {
+  log: 'full',
+  allow: { findings: [{ check: 'assets', file: 'rewrite/bad/data/level1.dat', reason: 'our own test level' },
+    { check: 'tables', file: 'rewrite/bad/src/tables.rs', line: 2, reason: 'generated fonts' },
+    { check: 'tables', file: 'rewrite/bad/src/tables.rs', line: 99, reason: 'wrong line: not applied' }]
+  }
+})
+rc('allow-list without reason', ['rewrite/bad'], { allow: { findings: [{ check: 'assets', file: 'x', reason: ' ' }] } })
+rc('allow-list not JSON', ['rewrite/bad'], { allow: '{not json' })
+rc('allow-list wrong shape', ['rewrite/bad'], { allow: { items: [] } })
+rc('names file not JSON', [], { cleanroom: { names: ['libraries.json', 'gamedir/data/level1.dat.json'] }, log: 'full' })
+rc('custom thresholds and excludes', ['rewrite/bad'], { log: 'full', cleanroom: { thresholds: { code_pct: 100, const_pct: 100, file_pct: 100, table_items: 2000, string_items: 100, string_bytes: 100000, names_pct: 100 }, tree_exclude: ['data/**', 'src/copy.*'] } })
+rc('no reference', [], { log: 'full', cleanroom: { reference: ['nowhere', 'also/missing'] } })
+rc('tree in a forbidden area', ['src_matched'], { log: 'full' })
+rc('tree is a file', ['libraries.json'])
+rc('tree outside the project', ['..'])
+rc('missing tree', ['nope'])
+rc('default tree missing', [], { cleanroom: { tree: 'rewrite/none' } })
+rc('help', ['--help'])
+rc('unknown option', ['--bogus'])
 
 // ------------------------------------------------------------------------------------------ running
 const MASKS = [

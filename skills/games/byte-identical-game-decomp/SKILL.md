@@ -21,6 +21,9 @@ compatibility: >
 The end state the user wants: **give it the installer of a game they own, get back everything in readable,
 editable form that rebuilds the game's files byte for byte** - data and code. Nothing derived from the game
 is published; the tools need the user's own installer, the way console decomp projects need your own ROM.
+The decompilation is private in every case. A rewrite others may download is possible only through the
+game-rewrite skill's clean-room mode, where the people who write it never see this skill's code output
+(`references/legal-and-repo.md`).
 
 The work is a pipeline of phases. Each phase has a hard acceptance gate (SHA-256 identity or full coverage),
 so a later phase never builds on an unverified earlier one. Phases 3, 5 and 6 are large; they are designed
@@ -28,8 +31,8 @@ to be split across many subagents (see "Orchestration").
 
 | # | Phase | Output | Gate |
 |---|---|---|---|
-| 0 | Ownership, legal, repo setup | private repo, `.gitignore` for game-derived dirs | user confirms they own the game |
-| 1 | Installer intake | game tree + SHA-256 manifest | extracted tree identical to a real install |
+| 0 | Ownership, legal, repo setup | mode (private / publishable), private repo, `.gitignore` for game-derived dirs | user confirms they own the game and picks the mode |
+| 1 | Installer intake | game tree + SHA-256 manifest + protection report | extracted tree identical to a real install; no copy protection or packer |
 | 2 | Inventory | census of formats, archives, XOR layers, binaries | every file classified |
 | 3 | Data decoding | one decoder module per format group, decoded tree, previews | 100% files rebuild SHA-256-identical; opaque bytes reported |
 | 4 | Code recovery | complete function set for exe + every DLL, decompiled | 0 orphan instructions; only data left outside functions |
@@ -57,7 +60,13 @@ the subagent work (decoders, naming, matching) is still yours to run.
 Ask the user to confirm they own the game and to provide the installer path (GOG `setup_<game>_<ver>.exe`
 plus any `.bin` parts beside it) or the installed folder. Explain once: the decoders/tools are theirs to keep
 and share; anything derived from the game (extracted files, decoded assets, decompiled code, previews,
-names maps containing game strings) stays local and out of git. Set up `.gitignore` before the first commit
+names maps containing game strings) stays local and out of git. Ask which mode the project is in and record
+it as `"mode"` in `decomp.json`: **private** (default: everything stays on the user's machine, a later
+rewrite may be translated from the matched code) or **publishable** (the user wants to release a rewrite
+some day: it must then be written clean-room, by agents that never read the decompilation; plan that from
+the start, see game-rewrite `references/cleanroom.md`). `references/legal-and-repo.md` has the reasons
+(copyright covers code and assets, not behaviour or formats; decompiling is for the user's own analysis;
+circumventing copy protection is unlawful on its own) - summarise them, and say it is not legal advice. Set up `.gitignore` before the first commit
 (template in `references/legal-and-repo.md`) and keep any GitHub repo private unless the user decides
 otherwise. Never put the user's name, paths or email into commits beyond what git config already holds;
 replace absolute local paths in committed reports with placeholders like `<GAME_DIR>`.
@@ -67,7 +76,10 @@ replace absolute local paths in committed reports with placeholders like `<GAME_
 `python3 -I scripts/intake.py extract <setup.exe> <out>` unpacks the installer with the skill's own
 pure-Python Inno Setup reader (`scripts/inno.py`; slices `setup_x-N.bin`, every file's stored checksum
 verified). Then `intake.py verify-hashdb <game_dir>` checks every file against GOG's own MD5 list
-(`goggame-<id>.hashdb`) - the gate - and `intake.py manifest` writes the SHA-256 manifest to commit. An
+(`goggame-<id>.hashdb`) - the gate - and `intake.py manifest` writes the SHA-256 manifest to commit.
+`scripts/protection_check.py <game_dir>` is the second gate: on any copy protection (SafeDisc, SecuROM,
+StarForce, the Steam DRM wrapper, ...) or packer, stop and tell the user - never remove, bypass or unpack
+one; a heuristic warning needs the user's decision (`references/intake.md`). An
 already installed folder works too (copy it; same gate). Details, GOG quirks (`{app}` vs `{tmp}` files,
 installer-only folders, unsupported RAR-based `.bin` parts) are in `references/intake.md`.
 
@@ -195,7 +207,7 @@ than shown, say so. When a step is not done, say so.
 | `references/reassembly.md` | phase 5b |
 | `references/matching-decomp.md` | phase 6; compiler, flags, objcmp.py |
 | `references/orchestration.md` | spawning workflows/subagents for any phase |
-| `references/legal-and-repo.md` | repo setup, what may be committed, privacy |
+| `references/legal-and-repo.md` | phase 0: the two modes, the legal reasons behind every rule, copy protection, what may be committed, privacy |
 
 ## Scripts
 
@@ -206,6 +218,7 @@ than shown, say so. When a step is not done, say so.
 | `scripts/formats/` | 3 | generic decoders to copy into a project: PNG, WAV, ZIP (+ 7-Zip deflate port), text template (its README) |
 | `scripts/inno.py` | 1 | pure-Python Inno Setup (GOG installer) reader: info, list, extract |
 | `scripts/intake.py` | 1 | extraction via inno.py, GOG hashdb gate, SHA-256 manifests, tree comparison |
+| `scripts/protection_check.py` | 1 | copy-protection and packer gate: file names, PE sections, imports, signatures, entry-point heuristics |
 | `scripts/inventory.py` | 2 | format census, magic and single-byte-XOR detection, archive member counts |
 | `scripts/verify.py` | 3 | the round-trip harness for every decoder module |
 | `scripts/pngio.py` | 3 | stdlib PNG writer/reader for decoders |
