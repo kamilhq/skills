@@ -5,11 +5,15 @@
 
 ## Install
 
-`install.sh` installs skills for Claude Code, Codex or both, straight from GitHub (no clone needed):
+`install.sh` installs skills for Claude Code, Codex or both, straight from GitHub (no clone needed).
+Run it from your project's folder; the skills go into that project:
 
 ```sh
+cd your-project
 curl -fsSL https://raw.githubusercontent.com/kamilhq/skills/main/install.sh | sh -s -- --agent claude --skill games
 ```
+
+Add `--global` to install them for your user instead, for every project.
 
 Without `--agent` or `--skill` it asks. Options:
 
@@ -17,7 +21,8 @@ Without `--agent` or `--skill` it asks. Options:
 |---|---|
 | `--agent claude\|codex\|both` | which agent to install for (repeatable, or comma-separated) |
 | `--skill NAME` | a skill name, a group (`games`, `apple`) or `all` (repeatable, or comma-separated) |
-| `--project DIR` | install into one project instead of for your user |
+| `--project DIR` | install into the project in `DIR` instead of the current directory |
+| `--global` | install for your user instead of into a project |
 | `--ref REF` | branch, tag or commit to install from (default `main`) |
 | `--list` | list the skills and exit |
 | `--dry-run` | show what would be installed, change nothing |
@@ -26,10 +31,12 @@ Without `--agent` or `--skill` it asks. Options:
 
 Where the skills go:
 
-| Agent | For your user | With `--project DIR` |
+| Agent | Default (current directory) | With `--global` |
 |---|---|---|
-| Claude Code | `~/.claude/skills/<skill>` | `DIR/.claude/skills/<skill>` |
-| Codex | `~/.agents/skills/<skill>` | `DIR/.agents/skills/<skill>` |
+| Claude Code | `./.claude/skills/<skill>` | `~/.claude/skills/<skill>` |
+| Codex | `./.agents/skills/<skill>` | `~/.agents/skills/<skill>` |
+
+Commit those folders to share the skills with everyone working on the project.
 
 Running it again updates the skills it installed (it marks each folder with a `.skills-install` file).
 Folders it did not install are left alone unless you pass `--force`, and nothing else in those

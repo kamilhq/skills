@@ -5,12 +5,15 @@
 #
 # or from a checkout:  sh install.sh [options]
 #
+# Skills go into the current directory (./.claude/skills for Claude Code, ./.agents/skills for Codex), so
+# run it from the project that should have them; --global installs them for your user instead.
+#
 # Options
 #   --agent A       claude, codex or both (repeatable, or comma-separated)
 #   --skill S       a skill name, a group (a folder under skills/, e.g. games, apple) or all
 #                   (repeatable, or comma-separated)
-#   --project DIR   install into a project (DIR/.claude/skills, DIR/.agents/skills) instead of for your user
-#                   (~/.claude/skills, ~/.agents/skills)
+#   --project DIR   install into the project in DIR instead of the current directory
+#   --global        install for your user (~/.claude/skills, ~/.agents/skills) instead of into a project
 #   --ref REF       branch, tag or commit to install from (default: main)
 #   --repo O/N      GitHub repository to install from (default: kamilhq/skills)
 #   --local         use the checkout this script is in instead of downloading
@@ -29,6 +32,7 @@ REF=main
 AGENTS=
 SKILLS=
 PROJECT=
+GLOBAL=0
 LOCAL=0
 FORCE=0
 DRY=0
@@ -52,6 +56,7 @@ while [ $# -gt 0 ]; do
     --skill=*|--skills=*) SKILLS="$SKILLS,${1#*=}"; shift ;;
     --project) need_arg "$@"; PROJECT=$2; shift 2 ;;
     --project=*) PROJECT=${1#*=}; shift ;;
+    --global|--user) GLOBAL=1; shift ;;
     --ref) need_arg "$@"; REF=$2; shift 2 ;;
     --ref=*) REF=${1#*=}; shift ;;
     --repo) need_arg "$@"; REPO=$2; shift 2 ;;
@@ -62,7 +67,7 @@ while [ $# -gt 0 ]; do
     --list) LIST=1; shift ;;
     -h|--help)
       if [ -f "$0" ] && grep -q 'Install skills from this repository' "$0" 2>/dev/null; then usage
-      else say 'Options: --agent claude|codex|both  --skill NAME|GROUP|all  --project DIR  --ref REF  --repo O/N  --local  --force  --dry-run  --list'; fi
+      else say 'Options: --agent claude|codex|both  --skill NAME|GROUP|all  --project DIR  --global  --ref REF  --repo O/N  --local  --force  --dry-run  --list'; fi
       exit 0 ;;
     *) die "unknown option: $1 (see --help)" ;;
   esac
@@ -182,13 +187,17 @@ for r in $REQUIRES; do  # bring along what a selected skill needs
 done
 
 # --- install ----------------------------------------------------------------------------------------
-if [ -n "$PROJECT" ]; then
+if [ "$GLOBAL" = 1 ] && [ -n "$PROJECT" ]; then die "--global and --project exclude each other"; fi
+if [ "$GLOBAL" = 0 ]; then
+  PROJECT=${PROJECT:-.}
   [ -d "$PROJECT" ] || die "project folder not found: $PROJECT"
   BASE=$(cd "$PROJECT" && pwd)
+  say "Installing into the project in $BASE"
   CLAUDE_DIR="$BASE/.claude/skills"; CODEX_DIR="$BASE/.agents/skills"
 else
   [ -n "${HOME:-}" ] || die "HOME is not set"
   CLAUDE_DIR="$HOME/.claude/skills"; CODEX_DIR="$HOME/.agents/skills"
+  say "Installing for your user in $HOME"
 fi
 
 installed=0; skipped=0
