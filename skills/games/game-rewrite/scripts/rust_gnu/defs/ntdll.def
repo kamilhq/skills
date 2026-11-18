@@ -1,0 +1,9 @@
+LIBRARY ntdll.dll
+EXPORTS
+    _NtCreateFile@44 == NtCreateFile
+    _NtCreateNamedPipeFile@56 == NtCreateNamedPipeFile
+    _NtOpenFile@24 == NtOpenFile
+    _NtReadFile@36 == NtReadFile
+    _NtSetInformationFile@20 == NtSetInformationFile
+    _NtWriteFile@36 == NtWriteFile
+    _RtlNtStatusToDosError@4 == RtlNtStatusToDosError

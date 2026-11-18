@@ -1,0 +1,27 @@
+LIBRARY ws2_32.dll
+EXPORTS
+    _accept@12 == accept
+    _bind@12 == bind
+    _closesocket@4 == closesocket
+    _connect@12 == connect
+    _freeaddrinfo@4 == freeaddrinfo
+    _getaddrinfo@16 == getaddrinfo
+    _GetHostNameW@8 == GetHostNameW
+    _getpeername@12 == getpeername
+    _getsockname@12 == getsockname
+    _getsockopt@20 == getsockopt
+    _ioctlsocket@12 == ioctlsocket
+    _listen@8 == listen
+    _recv@16 == recv
+    _recvfrom@24 == recvfrom
+    _select@20 == select
+    _send@16 == send
+    _sendto@24 == sendto
+    _setsockopt@20 == setsockopt
+    _shutdown@8 == shutdown
+    _WSADuplicateSocketW@12 == WSADuplicateSocketW
+    _WSAGetLastError@0 == WSAGetLastError
+    _WSARecv@28 == WSARecv
+    _WSASend@28 == WSASend
+    _WSASocketW@24 == WSASocketW
+    _WSAStartup@8 == WSAStartup

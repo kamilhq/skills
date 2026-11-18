@@ -1,0 +1,6 @@
+#!/bin/sh
+# rustc runs this for raw-dylib import libraries on i686-pc-windows-gnu (see ../dlltool.py).
+# REWRITE_DLLTOOL=node uses the JavaScript port instead.
+D="$(cd "$(dirname "$0")" && pwd)"
+if [ "${REWRITE_DLLTOOL:-python}" = node ]; then exec node "$D/../../js/rust_gnu/dlltool.mjs" "$@"; fi
+exec python3 -I "$D/../dlltool.py" "$@"
