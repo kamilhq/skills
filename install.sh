@@ -39,8 +39,8 @@ DRY=0
 LIST=0
 MARK=.skills-install
 
-# skills that need another skill to be useful: "skill:needed ..."
-REQUIRES='game-rewrite:byte-identical-game-decomp'
+# skills that need another skill to be useful: "skill:needed ..." (none at the moment)
+REQUIRES=''
 
 say() { printf '%s\n' "$*"; }
 err() { printf 'install.sh: %s\n' "$*" >&2; }
